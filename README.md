@@ -1,12 +1,13 @@
 # 📊 Sistema de Monitoramento de Hemogramas
 
+Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com objetivo de implementar um sistema capaz de receber, processar e analisar hemogramas em tempo real, detectando anomalias individuais e coletivas e notificando gestores de saúde pública.
+
+---
+
 ## 👥 Integrantes da Equipe
 
 -   👨‍💻 [Samuel Jose Alves] - [202201712]
 -   👨‍💻 [Vitor Martins Castanheira] - [202201717]
-
-
-Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com objetivo de implementar um sistema capaz de receber, processar e analisar hemogramas em tempo real, detectando anomalias individuais e coletivas e notificando gestores de saúde pública.
 
 ---
 
