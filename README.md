@@ -72,7 +72,7 @@ O sistema será composto por:
 
 ---
 
-## 🛠️ Tecnologias utilizadas 
+## 🛠️ Tecnologias utilizadas (sujeito a mudanças)
 - **Backend**: Java/Kotlin + Spring Boot  
 - **FHIR**: [HAPI FHIR](https://hapifhir.io/)  
 - **Banco de Dados**: PostgreSQL ou MongoDB  
