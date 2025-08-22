@@ -8,6 +8,7 @@
 
 Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com objetivo de implementar um sistema capaz de receber, processar e analisar hemogramas em tempo real, detectando anomalias individuais e coletivas e notificando gestores de saúde pública.
 
+---
 
 ## 🚀 Objetivo
 Permitir que gestores de saúde recebam, em tempo real, **alertas baseados em evidências laboratoriais populacionais**, a partir de hemogramas enviados por laboratórios da rede estadual.
