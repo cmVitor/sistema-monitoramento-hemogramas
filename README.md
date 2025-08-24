@@ -6,7 +6,7 @@ Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com 
 
 ## 👥 Integrantes da Equipe
 
--   👨‍💻 [Samuel Jose Alves] - [202201712]
+-   👨‍💻 [Samuel Jose Evangelista Alves] - [202201712]
 -   👨‍💻 [Vitor Martins Castanheira] - [202201717]
 
 ---
