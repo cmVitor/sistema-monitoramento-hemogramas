@@ -73,11 +73,11 @@ O sistema será composto por:
 ---
 
 ## 🛠️ Tecnologias utilizadas (sujeito a mudanças)
-- **Backend**: Java/Kotlin + Spring Boot  
+- **Backend**: Java + Spring Boot  
 - **FHIR**: [HAPI FHIR](https://hapifhir.io/)  
 - **Banco de Dados**: PostgreSQL ou MongoDB  
 - **API REST**: Spring Boot REST Controllers  
-- **App Mobile**: Android (Jetpack Compose) ou Flutter  
+- **App Mobile**: React Native ou Flutter  
 - **Notificações Push**: Firebase Cloud Messaging  
 
 ---
@@ -101,8 +101,8 @@ flowchart TD
 | Sprint 1 | Setembro/2025 | Marco 1 – Recepção FHIR (Subscription + Parsing)      | ⬜ Pendente |
 | Sprint 2 | Outubro/2025  | Marco 2 – Análise Individual (detecção de desvios)    | ⬜ Pendente |
 | Sprint 3 | Novembro/2025 | Marco 3 – Base Consolidada (persistência dos dados)   | ⬜ Pendente |
-| Sprint 4 | Dezembro/2025 | Marco 4 – Análise Coletiva (padrões populacionais) <br> API REST para alertas <br> App Android com notificações push | ⬜ Pendente |
-
+| Sprint 4 | Dezembro/2025 | Marco 4 – Análise Coletiva (padrões populacionais)    | ⬜ Pendente |
+| Sprint Final| Dezembro/2025 | Entrega Final - Apresentação do sistema completo, incluindo API, App Móvel e documentação final | ⬜ Pendente | 
 Legenda: ⬜ Pendente | 🟨 Em andamento | ✅ Concluído
 
 
