@@ -9,6 +9,7 @@ Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com 
 -   👨‍💻 [Samuel Jose Evangelista Alves] - [202201712]
 -   👨‍💻 [Vitor Martins Castanheira] - [202201717]
 -   👨‍💻 [Guilherme Gonçalves Dutra de Mendonça] - [202201692]
+-   👨‍💻 [Leonardo Ribeiro Oliveira Palmeira] - [202201701]
 
 ---
 
