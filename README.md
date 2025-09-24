@@ -13,6 +13,7 @@ Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com 
 -   👨‍💻 [Leonardo Ribeiro Oliveira Palmeira] - [202201701]
 -   👨‍💻 [Frederico Garcêz Rodrigues] - [202201690]
 
+
 ---
 
 ## 🚀 Objetivo
