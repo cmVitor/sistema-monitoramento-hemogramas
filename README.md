@@ -18,6 +18,11 @@ Permitir que gestores de saúde recebam, em tempo real, **alertas baseados em ev
 
 ---
 
+## 📌 Caso específico de uso
+https://docs.google.com/document/d/1nZMXgcjBi-CoS1EIFbuKScNUfYbSLRIFcHnM_TwVv_Q/edit?tab=t.0#heading=h.7azzr1pwqi8c
+
+---
+
 ## 🏗️ Arquitetura Geral
 O sistema será composto por:
 
