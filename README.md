@@ -10,6 +10,7 @@ Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com 
 -   👨‍💻 [Vitor Martins Castanheira] - [202201717]
 -   👨‍💻 [Guilherme Gonçalves Dutra de Mendonça] - [202201692]
 -   👨‍💻 [Leonardo Ribeiro Oliveira Palmeira] - [202201701]
+-   👨‍💻 [Frederico Garcêz Rodrigues] - [202201690]
 
 ---
 
