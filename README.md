@@ -6,6 +6,7 @@ Projeto desenvolvido para a disciplina **Software para Sistemas Ubíquos**, com 
 
 ## 👥 Integrantes da Equipe
 
+-   👨‍💻 [Mikael Borges de Oliveira e Silva Junior] - [202201708]
 -   👨‍💻 [Samuel Jose Evangelista Alves] - [202201712]
 -   👨‍💻 [Vitor Martins Castanheira] - [202201717]
 -   👨‍💻 [Guilherme Gonçalves Dutra de Mendonça] - [202201692]
