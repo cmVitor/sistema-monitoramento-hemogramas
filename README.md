@@ -80,10 +80,10 @@ O sistema será composto por:
 ---
 
 ## 🛠️ Tecnologias utilizadas (sujeito a mudanças)
-- **Backend**: Java + Spring Boot  
+- **Backend**: Python + FastAPI  
 - **FHIR**: [HAPI FHIR](https://hapifhir.io/)  
 - **Banco de Dados**: PostgreSQL ou MongoDB  
-- **API REST**: Spring Boot REST Controllers  
+- **API REST**: FastAPI  
 - **App Mobile**: React Native ou Flutter  
 - **Notificações Push**: Firebase Cloud Messaging  
 
