@@ -1,0 +1,178 @@
+# 1) Health check
+curl -s http://localhost:8000/health
+
+# 2) Enviar 5 Observations para Jataí (IBGE 5211909).
+# Três com leucócitos elevados (>= 11000/uL) e dois normais. 
+# Observação: a cada POST, o sistema pode gerar um alerta novo, pois não há deduplicação.
+
+# Elevado 1 (Jataí)
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceType": "Observation",
+    "id": "obs-jatai-1",
+    "status": "final",
+    "code": {
+      "coding": [
+        {"system": "http://loinc.org", "code": "6690-2", "display": "Leukocytes [#/volume] in Blood"}
+      ],
+      "text": "Leukocytes"
+    },
+    "valueQuantity": {
+      "value": 15000,
+      "unit": "10^3/uL",
+      "system": "http://unitsofmeasure.org",
+      "code": "10^3/uL"
+    },
+    "subject": {
+      "identifier": {
+        "system": "http://ibge.gov.br/municipios",
+        "value": "5211909"
+      },
+      "display": "Paciente Exemplo"
+    },
+    "effectiveDateTime": "2025-10-31T12:00:00Z"
+  }'
+
+# Elevado 2 (Jataí)
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceType": "Observation",
+    "id": "obs-jatai-2",
+    "status": "final",
+    "code": {
+      "coding": [
+        {"system": "http://loinc.org", "code": "6690-2", "display": "Leukocytes [#/volume] in Blood"}
+      ],
+      "text": "Leukocytes"
+    },
+    "valueQuantity": {
+      "value": 12000,
+      "unit": "10^3/uL",
+      "system": "http://unitsofmeasure.org",
+      "code": "10^3/uL"
+    },
+    "subject": {
+      "identifier": {
+        "system": "http://ibge.gov.br/municipios",
+        "value": "5211909"
+      }
+    },
+    "effectiveDateTime": "2025-10-31T12:05:00Z"
+  }'
+
+# Normal 1 (Jataí)
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceType": "Observation",
+    "id": "obs-jatai-3",
+    "status": "final",
+    "code": {
+      "coding": [
+        {"system": "http://loinc.org", "code": "6690-2", "display": "Leukocytes [#/volume] in Blood"}
+      ],
+      "text": "Leukocytes"
+    },
+    "valueQuantity": {
+      "value": 9000,
+      "unit": "10^3/uL",
+      "system": "http://unitsofmeasure.org",
+      "code": "10^3/uL"
+    },
+    "subject": {
+      "identifier": {
+        "system": "http://ibge.gov.br/municipios",
+        "value": "5211909"
+      }
+    },
+    "effectiveDateTime": "2025-10-31T12:10:00Z"
+  }'
+
+# Elevado 3 (Jataí)
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: "application/json" \
+  -d "{
+    \"resourceType\": \"Observation\",
+    \"id\": \"obs-jatai-4\",
+    \"status\": \"final\",
+    \"code\": {
+      \"coding\": [
+        {\"system\": \"http://loinc.org\", \"code\": \"6690-2\", \"display\": \"Leukocytes [#/volume] in Blood\"}
+      ],
+      \"text\": \"Leukocytes\"
+    },
+    \"valueQuantity\": {
+      \"value\": 14000,
+      \"unit\": \"10^3/uL\",
+      \"system\": \"http://unitsofmeasure.org\",
+      \"code\": \"10^3/uL\"
+    },
+    \"subject\": {
+      \"identifier\": {
+        \"system\": \"http://ibge.gov.br/municipios\",
+        \"value\": \"5211909\"
+      }
+    },
+    \"effectiveDateTime\": \"2025-10-31T12:15:00Z\"
+  }"
+
+# Normal 2 (Jataí)
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceType": "Observation",
+    "id": "obs-jatai-5",
+    "status": "final",
+    "code": {
+      "coding": [
+        {"system": "http://loinc.org", "code": "6690-2", "display": "Leukocytes [#/volume] in Blood"}
+      ],
+      "text": "Leukocytes"
+    },
+    "valueQuantity": {
+      "value": 8000,
+      "unit": "10^3/uL",
+      "system": "http://unitsofmeasure.org",
+      "code": "10^3/uL"
+    },
+    "subject": {
+      "identifier": {
+        "system": "http://ibge.gov.br/municipios",
+        "value": "5211909"
+      }
+    },
+    "effectiveDateTime": "2025-10-31T12:20:00Z"
+  }'
+
+# 3) Enviar Observations para Formosa (IBGE 5208004) com valores normais (não deve gerar alerta).
+curl -s -X POST http://localhost:8000/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceType": "Observation",
+    "id": "obs-formosa-1",
+    "status": "final",
+    "code": {
+      "coding": [
+        {"system": "http://loinc.org", "code": "6690-2", "display": "Leukocytes [#/volume] in Blood"}
+      ],
+      "text": "Leukocytes"
+    },
+    "valueQuantity": {
+      "value": 7000,
+      "unit": "10^3/uL",
+      "system": "http://unitsofmeasure.org",
+      "code": "10^3/uL"
+    },
+    "subject": {
+      "identifier": {
+        "system": "http://ibge.gov.br/municipios",
+        "value": "5208004"
+      }
+    },
+    "effectiveDateTime": "2025-10-31T12:30:00Z"
+  }'
+
+# 4) Listar alertas
+curl -s http://localhost:8000/alerts | jq .
