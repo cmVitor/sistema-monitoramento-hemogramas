@@ -10,6 +10,9 @@ class HemogramObservation(Base):
     region_ibge_code = Column(String, index=True)
     received_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     leukocytes = Column(Float, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    telefone = Column(String, nullable=True)
     raw = Column(JSON, nullable=False)
 
 class AlertCommunication(Base):

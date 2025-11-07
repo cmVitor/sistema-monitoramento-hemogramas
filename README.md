@@ -81,12 +81,43 @@ O sistema será composto por:
 ---
 
 ## 🛠️ Tecnologias utilizadas (sujeito a mudanças)
-- **Backend**: Java + Spring Boot  
-- **FHIR**: [HAPI FHIR](https://hapifhir.io/)  
-- **Banco de Dados**: PostgreSQL ou MongoDB  
-- **API REST**: Spring Boot REST Controllers  
-- **App Mobile**: React Native ou Flutter  
-- **Notificações Push**: Firebase Cloud Messaging  
+- **Backend**: FastAPI (Python)
+- **FHIR**: fhir.resources (Python)
+- **Banco de Dados**: PostgreSQL
+- **API REST**: FastAPI
+- **Visualização**: Leaflet.js + Leaflet.heat
+- **App Mobile**: React Native ou Flutter (planejado)
+- **Notificações Push**: Firebase Cloud Messaging (planejado)
+- **Containerização**: Docker + Docker Compose
+
+---
+
+## 🗺️ Mapa de Calor em Tempo Real
+
+O sistema inclui uma visualização interativa em mapa de calor que mostra todos os casos de hemogramas registrados em tempo real.
+
+### Como Usar
+
+1. Inicie o sistema:
+```bash
+cd application
+docker-compose up --build
+```
+
+2. Acesse o mapa de calor no navegador:
+```
+http://localhost:8000
+```
+
+### Funcionalidades
+
+- **Visualização Geográfica**: Mapa de calor mostrando distribuição de casos
+- **Intensidade por Leucócitos**: Cores indicam níveis de leucócitos (azul=baixo, vermelho=alto)
+- **Marcadores Interativos**: Clique nos pontos para ver detalhes do caso
+- **Atualização Automática**: Dados atualizados automaticamente a cada 30 segundos
+- **Estatísticas em Tempo Real**: Total de casos e horário da última atualização
+
+Para mais detalhes, consulte [MAPA_CALOR.md](MAPA_CALOR.md)
 
 ---
 
