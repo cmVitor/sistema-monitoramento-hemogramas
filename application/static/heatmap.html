@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Calor - Monitoramento de Hemogramas</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        #controls {
+            background-color: #2a2a2a;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat {
+            background-color: #3a3a3a;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            min-width: 120px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        #map {
+            height: calc(100vh - 140px);
+            width: 100%;
+        }
+
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            color: #333;
+        }
+
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-color {
+            width: 30px;
+            height: 15px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .refresh-btn:active {
+            transform: translateY(0);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #3a3a3a;
+            padding: 8px 15px;
+            border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Mapa de Calor - Monitoramento de Hemogramas</h1>
+        <div class="subtitle">Visualização em tempo real dos casos registrados</div>
+    </div>
+
+    <div id="controls">
+        <div class="control-group">
+            <div class="stat">
+                <div class="stat-label">Total de Casos</div>
+                <div class="stat-value" id="totalCases">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Última Atualização</div>
+                <div class="stat-value" id="lastUpdate" style="font-size: 14px;">--:--:--</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>Atualização automática ativa</span>
+            </div>
+            <button class="refresh-btn" onclick="loadHeatmapData()">Atualizar Agora</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Heat Plugin -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <script>
+        // Initialize map centered on Brazil
+        const map = L.map('map').setView([-14.235, -51.925], 4);
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Dark mode tile layer alternative
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxZoom: 19
+        }).addTo(map);
+
+        let heatLayer = null;
+        let markersLayer = L.layerGroup().addTo(map);
+
+        // Add legend
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <h4>Intensidade</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(0, 0, 255, 0.6);"></div>
+                    <span>Baixa</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(0, 255, 0, 0.6);"></div>
+                    <span>Média</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(255, 255, 0, 0.6);"></div>
+                    <span>Alta</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(255, 0, 0, 0.6);"></div>
+                    <span>Muito Alta</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        function updateStats(dataCount) {
+            document.getElementById('totalCases').textContent = dataCount;
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-BR');
+            document.getElementById('lastUpdate').textContent = timeString;
+        }
+
+        function loadHeatmapData() {
+            fetch('/heatmap-data')
+                .then(response => response.json())
+                .then(data => {
+                    // Remove old heat layer
+                    if (heatLayer) {
+                        map.removeLayer(heatLayer);
+                    }
+
+                    // Clear markers
+                    markersLayer.clearLayers();
+
+                    // Prepare heat data [lat, lng, intensity]
+                    const heatData = data.map(point => {
+                        // Normalize intensity (assuming leukocytes range 0-20000)
+                        const normalizedIntensity = Math.min(point.intensity / 20000, 1);
+                        return [point.lat, point.lng, normalizedIntensity];
+                    });
+
+                    // Create heat layer
+                    heatLayer = L.heatLayer(heatData, {
+                        radius: 25,
+                        blur: 35,
+                        maxZoom: 10,
+                        max: 1.0,
+                        gradient: {
+                            0.0: 'blue',
+                            0.3: 'lime',
+                            0.5: 'yellow',
+                            0.7: 'orange',
+                            1.0: 'red'
+                        }
+                    }).addTo(map);
+
+                    // Add markers for each point
+                    data.forEach(point => {
+                        const marker = L.circleMarker([point.lat, point.lng], {
+                            radius: 5,
+                            fillColor: '#667eea',
+                            color: '#fff',
+                            weight: 1,
+                            opacity: 0.8,
+                            fillOpacity: 0.6
+                        });
+
+                        marker.bindPopup(`
+                            <strong>Região IBGE:</strong> ${point.region}<br>
+                            <strong>Leucócitos:</strong> ${point.intensity ? point.intensity.toFixed(2) : 'N/A'}<br>
+                            <strong>Data:</strong> ${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}
+                        `);
+
+                        marker.addTo(markersLayer);
+                    });
+
+                    // Update statistics
+                    updateStats(data.length);
+
+                    console.log(`Loaded ${data.length} points for heatmap`);
+                })
+                .catch(error => {
+                    console.error('Error loading heatmap data:', error);
+                });
+        }
+
+        // Initial load
+        loadHeatmapData();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadHeatmapData, 30000);
+    </script>
+</body>
+</html>

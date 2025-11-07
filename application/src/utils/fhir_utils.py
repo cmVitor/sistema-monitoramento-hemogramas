@@ -121,6 +121,105 @@ def looks_like_pii_identifier(ident: Dict[str, Any]) -> bool:
         return True
     return False
 
+def extract_latitude(observation: Dict[str, Any]) -> Optional[float]:
+    """Extrai latitude de extensions ou subject"""
+    # Procura em extensions
+    for ext in observation.get("extension", []) or []:
+        url = ext.get("url", "").lower()
+        if "latitude" in url or "geolocation" in url:
+            if "valueDecimal" in ext:
+                try:
+                    return float(ext["valueDecimal"])
+                except (TypeError, ValueError):
+                    pass
+            # Geolocation extension pode ter position
+            if "extension" in ext:
+                for sub_ext in ext["extension"]:
+                    if "latitude" in sub_ext.get("url", "").lower():
+                        try:
+                            return float(sub_ext.get("valueDecimal", 0))
+                        except (TypeError, ValueError):
+                            pass
+
+    # Procura em subject (Location reference)
+    subject = observation.get("subject") or {}
+    if isinstance(subject, dict) and "extension" in subject:
+        for ext in subject["extension"]:
+            if "latitude" in ext.get("url", "").lower():
+                try:
+                    return float(ext.get("valueDecimal", 0))
+                except (TypeError, ValueError):
+                    pass
+
+    return None
+
+def extract_longitude(observation: Dict[str, Any]) -> Optional[float]:
+    """Extrai longitude de extensions ou subject"""
+    # Procura em extensions
+    for ext in observation.get("extension", []) or []:
+        url = ext.get("url", "").lower()
+        if "longitude" in url or "geolocation" in url:
+            if "valueDecimal" in ext:
+                try:
+                    return float(ext["valueDecimal"])
+                except (TypeError, ValueError):
+                    pass
+            # Geolocation extension pode ter position
+            if "extension" in ext:
+                for sub_ext in ext["extension"]:
+                    if "longitude" in sub_ext.get("url", "").lower():
+                        try:
+                            return float(sub_ext.get("valueDecimal", 0))
+                        except (TypeError, ValueError):
+                            pass
+
+    # Procura em subject (Location reference)
+    subject = observation.get("subject") or {}
+    if isinstance(subject, dict) and "extension" in subject:
+        for ext in subject["extension"]:
+            if "longitude" in ext.get("url", "").lower():
+                try:
+                    return float(ext.get("valueDecimal", 0))
+                except (TypeError, ValueError):
+                    pass
+
+    return None
+
+def extract_telefone(observation: Dict[str, Any]) -> Optional[str]:
+    """Extrai telefone de quem realizou o hemograma (performer)"""
+    # Procura em performer
+    performers = observation.get("performer", []) or []
+    for perf in performers:
+        if isinstance(perf, dict):
+            # Procura em telecom
+            telecoms = perf.get("telecom", []) or []
+            for telecom in telecoms:
+                if isinstance(telecom, dict):
+                    system = telecom.get("system", "").lower()
+                    if system in ("phone", "sms", "telefone"):
+                        value = telecom.get("value")
+                        if value:
+                            return str(value)
+
+            # Procura em extension
+            extensions = perf.get("extension", []) or []
+            for ext in extensions:
+                url = ext.get("url", "").lower()
+                if "phone" in url or "telefone" in url or "telecom" in url:
+                    value = ext.get("valueString") or ext.get("valueContactPoint", {}).get("value")
+                    if value:
+                        return str(value)
+
+    # Procura em extensions da observação
+    for ext in observation.get("extension", []) or []:
+        url = ext.get("url", "").lower()
+        if "performer-phone" in url or "telefone" in url:
+            value = ext.get("valueString") or ext.get("valueContactPoint", {}).get("value")
+            if value:
+                return str(value)
+
+    return None
+
 def build_fhir_communication_alert(region_ibge_code: str, stats: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "resourceType": "Communication",

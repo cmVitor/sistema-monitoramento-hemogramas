@@ -6,3 +6,4 @@ pydantic==2.8.2
 pydantic-settings==2.3.4
 python-dateutil==2.9.0.post0
 fhir.resources==7.1.0
+requests==2.31.0
