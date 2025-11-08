@@ -16,167 +16,472 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
-        }
-
-        #header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-top: 5px;
-        }
-
-        #controls {
-            background-color: #2a2a2a;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .stat {
-            background-color: #3a3a3a;
-            padding: 10px 20px;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            min-width: 120px;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
         }
 
         #map {
-            height: calc(100vh - 140px);
+            height: 100vh;
             width: 100%;
         }
 
-        .legend {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            color: #333;
+        /* Hide Leaflet attribution */
+        .leaflet-control-attribution {
+            display: none !important;
         }
 
-        .legend h4 {
-            margin-bottom: 10px;
-            color: #667eea;
+        /* Control Panel */
+        .control-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            min-width: 320px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .panel-title {
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 20px;
+            padding: 6px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .toggle-btn:hover {
+            color: #2563eb;
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        /* Legend */
+        .legend {
+            margin-bottom: 20px;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            margin: 5px 0;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #374151;
+            font-weight: 500;
         }
 
         .legend-color {
-            width: 30px;
-            height: 15px;
-            margin-right: 10px;
-            border-radius: 3px;
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            margin-right: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.8);
         }
 
-        .refresh-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
+        .legend-gradient {
+            height: 24px;
+            border-radius: 12px;
+            margin: 12px 0;
+            background: linear-gradient(90deg, 
+                #22c55e 0%,    /* Verde - Normal */
+                #eab308 20%,   /* Amarelo - Atenção */
+                #f97316 40%,   /* Laranja - Alto */
+                #dc2626 60%,   /* Vermelho - Crítico */
+                #7c2d12 80%,   /* Marrom escuro - Surto */
+                #4c1d95 100%   /* Roxo escuro - Surto crítico */
+            );
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 8px;
             font-weight: 600;
-            transition: transform 0.2s;
         }
 
-        .refresh-btn:hover {
-            transform: translateY(-2px);
+        /* Filter Options */
+        .filter-section {
+            margin-top: 15px;
         }
 
-        .refresh-btn:active {
-            transform: translateY(0);
-        }
-
-        .status-indicator {
+        .filter-option {
             display: flex;
             align-items: center;
-            gap: 8px;
-            background-color: #3a3a3a;
-            padding: 8px 15px;
-            border-radius: 8px;
+            padding: 14px 16px;
+            margin: 10px 0;
+            background: rgba(248, 250, 252, 0.8);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
         }
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
+        .filter-option:hover {
+            background: rgba(37, 99, 235, 0.05);
+            border-color: rgba(37, 99, 235, 0.2);
+            transform: translateX(4px);
+        }
+
+        .filter-option.active {
+            background: rgba(37, 99, 235, 0.1);
+            border-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+        }
+
+        .filter-option input[type="radio"] {
+            margin-right: 14px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #2563eb;
+        }
+
+        .filter-option label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .intensity-indicator {
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
-            background-color: #4ade80;
-            animation: pulse 2s infinite;
+            margin-left: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255, 255, 255, 0.8);
         }
 
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
+        .outbreak-indicator {
+            position: relative;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-left: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 3px solid #fbbf24;
+            background: #7c2d12;
+        }
+
+        .outbreak-indicator::after {
+            content: '⚠️';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 10px;
+        }
+
+        /* Statistics Panel */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02));
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid rgba(37, 99, 235, 0.1);
+            transition: all 0.2s;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(37, 99, 235, 0.1);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            color: #2563eb;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        /* Outbreak Alert */
+        .outbreak-alert {
+            background: linear-gradient(135deg, rgba(124, 45, 18, 0.15), rgba(76, 29, 149, 0.1));
+            border: 2px solid rgba(124, 45, 18, 0.4);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .outbreak-icon {
+            color: #7c2d12;
+            font-size: 18px;
+        }
+
+        .outbreak-text {
+            font-size: 13px;
+            color: #7c2d12;
+            font-weight: 600;
+        }
+
+        /* Collapsible sections */
+        .collapsible-content {
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+        }
+
+        /* Custom popup styles */
+        .leaflet-popup-content-wrapper {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .leaflet-popup-content {
+            margin: 20px 24px;
+            color: #1e293b;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(255, 255, 255, 0.98);
+            border: 2px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .popup-header {
+            border-bottom: 3px solid;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .popup-label {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .popup-value {
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-outbreak {
+            background: linear-gradient(135deg, rgba(124, 45, 18, 0.2), rgba(76, 29, 149, 0.15));
+            color: #7c2d12;
+            border: 2px solid rgba(124, 45, 18, 0.4);
+            box-shadow: 0 0 10px rgba(124, 45, 18, 0.3);
+        }
+
+        .status-normal {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+            border: 2px solid rgba(34, 197, 94, 0.3);
+        }
+
+        /* Enhanced marker pulse animation for outbreaks */
+        @keyframes pulse-outbreak {
+            0% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(124, 45, 18, 0.8), 0 0 0 0 rgba(76, 29, 149, 0.4);
             }
-            50% {
-                opacity: 0.5;
+            50% { 
+                transform: scale(1.15);
+                box-shadow: 0 0 0 8px rgba(124, 45, 18, 0.3), 0 0 0 15px rgba(76, 29, 149, 0.1);
             }
+            100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(124, 45, 18, 0), 0 0 0 0 rgba(76, 29, 149, 0);
+            }
+        }
+
+        .outbreak-marker {
+            animation: pulse-outbreak 2.5s infinite;
         }
     </style>
 </head>
 <body>
-    <div id="header">
-        <h1>Mapa de Calor - Monitoramento de Hemogramas</h1>
-        <div class="subtitle">Visualização em tempo real dos casos registrados</div>
-    </div>
-
-    <div id="controls">
-        <div class="control-group">
-            <div class="stat">
-                <div class="stat-label">Total de Casos</div>
-                <div class="stat-value" id="totalCases">0</div>
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <!-- Legend Panel -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <span class="panel-title">Legenda</span>
+                <button class="toggle-btn" onclick="toggleSection('legend')">−</button>
             </div>
-            <div class="stat">
-                <div class="stat-label">Última Atualização</div>
-                <div class="stat-value" id="lastUpdate" style="font-size: 14px;">--:--:--</div>
+            <div id="legend" class="collapsible-content">
+                <div class="legend">
+                    <div class="legend-gradient"></div>
+                    <div class="legend-labels">
+                        <span>Normal</span>
+                        <span>Atenção</span>
+                        <span>Alto</span>
+                        <span>Crítico</span>
+                        <span>Surto</span>
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #22c55e;"></div>
+                    <span>0 - 5.000 leucócitos (Normal)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #eab308;"></div>
+                    <span>5.000 - 10.000 leucócitos (Atenção)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f97316;"></div>
+                    <span>10.000 - 15.000 leucócitos (Alto)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #dc2626;"></div>
+                    <span>15.000+ leucócitos (Crítico)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #7c2d12, #4c1d95); border-color: #fbbf24; border-width: 3px;"></div>
+                    <span>Região com surto ativo ⚠️</span>
+                </div>
             </div>
         </div>
 
-        <div class="control-group">
-            <div class="status-indicator">
-                <div class="status-dot"></div>
-                <span>Atualização automática ativa</span>
+        <!-- Filter Panel -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <span class="panel-title">Filtros</span>
+                <button class="toggle-btn" onclick="toggleSection('filters')">−</button>
             </div>
-            <button class="refresh-btn" onclick="loadHeatmapData()">Atualizar Agora</button>
+            <div id="filters" class="collapsible-content">
+                <div class="filter-section">
+                    <div class="filter-option active" data-filter="all">
+                        <input type="radio" id="filter-all" name="intensity" value="all" checked>
+                        <label for="filter-all">Todos os Casos</label>
+                    </div>
+                    <div class="filter-option" data-filter="outbreak">
+                        <input type="radio" id="filter-outbreak" name="intensity" value="outbreak">
+                        <label for="filter-outbreak">Apenas Surtos</label>
+                        <div class="outbreak-indicator"></div>
+                    </div>
+                    <div class="filter-option" data-filter="low">
+                        <input type="radio" id="filter-low" name="intensity" value="low">
+                        <label for="filter-low">Nível Normal</label>
+                        <div class="intensity-indicator" style="background: #22c55e;"></div>
+                    </div>
+                    <div class="filter-option" data-filter="normal">
+                        <input type="radio" id="filter-normal" name="intensity" value="normal">
+                        <label for="filter-normal">Nível Atenção</label>
+                        <div class="intensity-indicator" style="background: #eab308;"></div>
+                    </div>
+                    <div class="filter-option" data-filter="high">
+                        <input type="radio" id="filter-high" name="intensity" value="high">
+                        <label for="filter-high">Nível Alto</label>
+                        <div class="intensity-indicator" style="background: #f97316;"></div>
+                    </div>
+                    <div class="filter-option" data-filter="critical">
+                        <input type="radio" id="filter-critical" name="intensity" value="critical">
+                        <label for="filter-critical">Nível Crítico</label>
+                        <div class="intensity-indicator" style="background: #dc2626;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <span class="panel-title">Estatísticas</span>
+                <button class="toggle-btn" onclick="toggleSection('stats')">−</button>
+            </div>
+            <div id="stats" class="collapsible-content">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-value" id="total-cases">0</span>
+                        <span class="stat-label">Total de Casos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="outbreak-count">0</span>
+                        <span class="stat-label">Surtos Ativos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="critical-cases">0</span>
+                        <span class="stat-label">Casos Críticos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="avg-intensity">0</span>
+                        <span class="stat-label">Média Leucócitos</span>
+                    </div>
+                </div>
+                
+                <div class="outbreak-alert" id="outbreak-alert" style="display: none;">
+                    <span class="outbreak-icon">⚠️</span>
+                    <div class="outbreak-text">
+                        <strong>Alerta de Surto:</strong> <span id="outbreak-regions">0</span> região(ões) com surto ativo detectado
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -189,118 +494,228 @@
 
     <script>
         // Initialize map centered on Brazil
-        const map = L.map('map').setView([-14.235, -51.925], 4);
+        const map = L.map('map', {
+            zoomControl: false,
+            preferCanvas: true
+        }).setView([-14.235, -51.925], 4);
 
-        // Add tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
-
-        // Dark mode tile layer alternative
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            maxZoom: 19
+        // Light, clear tile layer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '',
+            maxZoom: 18
         }).addTo(map);
 
         let heatLayer = null;
         let markersLayer = L.layerGroup().addTo(map);
+        let allData = [];
+        let currentFilter = 'all';
 
-        // Add legend
-        const legend = L.control({ position: 'bottomright' });
-        legend.onAdd = function(map) {
-            const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = `
-                <h4>Intensidade</h4>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(0, 0, 255, 0.6);"></div>
-                    <span>Baixa</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(0, 255, 0, 0.6);"></div>
-                    <span>Média</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(255, 255, 0, 0.6);"></div>
-                    <span>Alta</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: rgba(255, 0, 0, 0.6);"></div>
-                    <span>Muito Alta</span>
-                </div>
-            `;
-            return div;
+        // Distinct color scheme with clear differentiation
+        const colorScheme = {
+            low: '#22c55e',      // Verde - Normal
+            normal: '#eab308',   // Amarelo - Atenção  
+            high: '#f97316',     // Laranja - Alto
+            critical: '#dc2626', // Vermelho - Crítico
+            outbreak: '#7c2d12'  // Marrom escuro - Surto (bem diferente do vermelho)
         };
-        legend.addTo(map);
 
-        function updateStats(dataCount) {
-            document.getElementById('totalCases').textContent = dataCount;
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('pt-BR');
-            document.getElementById('lastUpdate').textContent = timeString;
+        // Toggle section functionality
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const button = section.previousElementSibling.querySelector('.toggle-btn');
+            
+            section.classList.toggle('collapsed');
+            button.textContent = section.classList.contains('collapsed') ? '+' : '−';
+        }
+
+        // Filter functionality
+        const filterOptions = document.querySelectorAll('.filter-option');
+        filterOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                filterOptions.forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+                this.querySelector('input[type="radio"]').checked = true;
+
+                currentFilter = this.dataset.filter;
+                updateHeatmap();
+            });
+        });
+
+        function filterDataByIntensity(data, filter) {
+            if (filter === 'all') return data;
+
+            return data.filter(point => {
+                const intensity = point.intensity;
+                switch(filter) {
+                    case 'outbreak':
+                        return point.region_outbreak === true;
+                    case 'low':
+                        return intensity >= 0 && intensity < 5000;
+                    case 'normal':
+                        return intensity >= 5000 && intensity < 10000;
+                    case 'high':
+                        return intensity >= 10000 && intensity < 15000;
+                    case 'critical':
+                        return intensity >= 15000;
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        function getColorByIntensity(intensity, isOutbreak = false) {
+            if (isOutbreak) {
+                return colorScheme.outbreak; // Marrom escuro para surtos
+            }
+            
+            if (intensity < 5000) {
+                return colorScheme.low;
+            } else if (intensity < 10000) {
+                return colorScheme.normal;
+            } else if (intensity < 15000) {
+                return colorScheme.high;
+            } else {
+                return colorScheme.critical;
+            }
+        }
+
+        function updateStatistics(data) {
+            const totalCases = data.length;
+            const outbreakCount = data.filter(p => p.region_outbreak).length;
+            const criticalCases = data.filter(p => p.intensity >= 15000).length;
+            const avgIntensity = data.length > 0 ? 
+                (data.reduce((sum, p) => sum + p.intensity, 0) / data.length).toFixed(0) : 0;
+
+            document.getElementById('total-cases').textContent = totalCases.toLocaleString();
+            document.getElementById('outbreak-count').textContent = outbreakCount;
+            document.getElementById('critical-cases').textContent = criticalCases;
+            document.getElementById('avg-intensity').textContent = avgIntensity;
+
+            // Show/hide outbreak alert
+            const outbreakAlert = document.getElementById('outbreak-alert');
+            if (outbreakCount > 0) {
+                outbreakAlert.style.display = 'flex';
+                document.getElementById('outbreak-regions').textContent = outbreakCount;
+            } else {
+                outbreakAlert.style.display = 'none';
+            }
+        }
+
+        function updateHeatmap() {
+            const filteredData = filterDataByIntensity(allData, currentFilter);
+
+            // Remove old layers
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+            markersLayer.clearLayers();
+
+            // Update statistics
+            updateStatistics(filteredData);
+
+            // Prepare heat data with distinct intensity mapping
+            const heatData = filteredData.map(point => {
+                let normalizedIntensity;
+                
+                if (point.region_outbreak) {
+                    normalizedIntensity = 1.0; // Max intensity for outbreaks
+                } else if (point.intensity >= 15000) {
+                    normalizedIntensity = 0.75; // Critical
+                } else if (point.intensity >= 10000) {
+                    normalizedIntensity = 0.55; // High
+                } else if (point.intensity >= 5000) {
+                    normalizedIntensity = 0.35;  // Normal/Attention
+                } else {
+                    normalizedIntensity = 0.15;  // Low/Normal
+                }
+                
+                return [point.lat, point.lng, normalizedIntensity];
+            });
+
+            // Create heat layer with distinct color progression
+            heatLayer = L.heatLayer(heatData, {
+                radius: 35,
+                blur: 20,
+                maxZoom: 10,
+                max: 1.0,
+                gradient: {
+                    0.0: 'rgba(34, 197, 94, 0.5)',   // Verde transparente
+                    0.25: 'rgba(234, 179, 8, 0.6)',  // Amarelo
+                    0.45: 'rgba(249, 115, 22, 0.7)', // Laranja
+                    0.65: 'rgba(220, 38, 38, 0.8)',  // Vermelho
+                    0.85: 'rgba(124, 45, 18, 0.9)',  // Marrom escuro
+                    1.0: 'rgba(76, 29, 149, 1.0)'    // Roxo escuro para surtos críticos
+                }
+            }).addTo(map);
+
+            // Add enhanced markers with distinct styling for outbreaks
+            filteredData.forEach(point => {
+                const markerColor = getColorByIntensity(point.intensity, point.region_outbreak);
+                const isOutbreak = point.region_outbreak;
+                
+                const marker = L.circleMarker([point.lat, point.lng], {
+                    radius: isOutbreak ? 12 : 7,
+                    fillColor: markerColor,
+                    color: isOutbreak ? '#fbbf24' : '#ffffff', // Borda dourada para surtos
+                    weight: isOutbreak ? 5 : 3,
+                    opacity: 1,
+                    fillOpacity: isOutbreak ? 0.95 : 0.8,
+                    className: isOutbreak ? 'outbreak-marker' : 'normal-marker'
+                });
+
+                // Enhanced popup with distinct styling for outbreaks
+                const statusBadge = isOutbreak
+                    ? '<span class="status-badge status-outbreak">⚠️ SURTO ATIVO</span>'
+                    : '<span class="status-badge status-normal">✓ Normal</span>';
+
+                const intensityLevel = point.intensity < 5000 ? 'Normal' :
+                                     point.intensity < 10000 ? 'Atenção' :
+                                     point.intensity < 15000 ? 'Alto' : 'Crítico';
+
+                marker.bindPopup(`
+                    <div>
+                        <h4 class="popup-header" style="border-color: ${markerColor};">
+                            ${isOutbreak ? '⚠️ ' : ''}Região ${point.region}
+                        </h4>
+                        <div class="popup-row">
+                            <span class="popup-label">Status:</span>
+                            ${statusBadge}
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Leucócitos:</span>
+                            <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Nível:</span>
+                            <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${isOutbreak ? 'SURTO' : intensityLevel}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Casos (7d):</span>
+                            <span class="popup-value">${point.region_case_count || 0}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Última atualização:</span>
+                            <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
+                        </div>
+                    </div>
+                `);
+
+                marker.addTo(markersLayer);
+            });
+
+            console.log(`Exibindo ${filteredData.length} de ${allData.length} pontos`);
         }
 
         function loadHeatmapData() {
             fetch('/heatmap-data')
                 .then(response => response.json())
                 .then(data => {
-                    // Remove old heat layer
-                    if (heatLayer) {
-                        map.removeLayer(heatLayer);
-                    }
-
-                    // Clear markers
-                    markersLayer.clearLayers();
-
-                    // Prepare heat data [lat, lng, intensity]
-                    const heatData = data.map(point => {
-                        // Normalize intensity (assuming leukocytes range 0-20000)
-                        const normalizedIntensity = Math.min(point.intensity / 20000, 1);
-                        return [point.lat, point.lng, normalizedIntensity];
-                    });
-
-                    // Create heat layer
-                    heatLayer = L.heatLayer(heatData, {
-                        radius: 25,
-                        blur: 35,
-                        maxZoom: 10,
-                        max: 1.0,
-                        gradient: {
-                            0.0: 'blue',
-                            0.3: 'lime',
-                            0.5: 'yellow',
-                            0.7: 'orange',
-                            1.0: 'red'
-                        }
-                    }).addTo(map);
-
-                    // Add markers for each point
-                    data.forEach(point => {
-                        const marker = L.circleMarker([point.lat, point.lng], {
-                            radius: 5,
-                            fillColor: '#667eea',
-                            color: '#fff',
-                            weight: 1,
-                            opacity: 0.8,
-                            fillOpacity: 0.6
-                        });
-
-                        marker.bindPopup(`
-                            <strong>Região IBGE:</strong> ${point.region}<br>
-                            <strong>Leucócitos:</strong> ${point.intensity ? point.intensity.toFixed(2) : 'N/A'}<br>
-                            <strong>Data:</strong> ${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}
-                        `);
-
-                        marker.addTo(markersLayer);
-                    });
-
-                    // Update statistics
-                    updateStats(data.length);
-
-                    console.log(`Loaded ${data.length} points for heatmap`);
+                    allData = data;
+                    updateHeatmap();
+                    console.log(`Carregados ${data.length} pontos para o mapa de calor`);
                 })
                 .catch(error => {
-                    console.error('Error loading heatmap data:', error);
+                    console.error('Erro ao carregar dados do mapa de calor:', error);
                 });
         }
 
