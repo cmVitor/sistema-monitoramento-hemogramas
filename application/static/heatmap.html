@@ -346,15 +346,15 @@
 
         /* Enhanced marker pulse animation for outbreaks */
         @keyframes pulse-outbreak {
-            0% { 
+            0% {
                 transform: scale(1);
                 box-shadow: 0 0 0 0 rgba(124, 45, 18, 0.8), 0 0 0 0 rgba(76, 29, 149, 0.4);
             }
-            50% { 
+            50% {
                 transform: scale(1.15);
                 box-shadow: 0 0 0 8px rgba(124, 45, 18, 0.3), 0 0 0 15px rgba(76, 29, 149, 0.1);
             }
-            100% { 
+            100% {
                 transform: scale(1);
                 box-shadow: 0 0 0 0 rgba(124, 45, 18, 0), 0 0 0 0 rgba(76, 29, 149, 0);
             }
@@ -362,6 +362,36 @@
 
         .outbreak-marker {
             animation: pulse-outbreak 2.5s infinite;
+        }
+
+        /* Estilos para área de surto */
+        @keyframes pulse-area {
+            0%, 100% {
+                opacity: 0.8;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .outbreak-area {
+            animation: pulse-area 3s ease-in-out infinite;
+        }
+
+        /* Estilo para pontos dentro de surtos */
+        .outbreak-point {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .outbreak-point:hover {
+            transform: scale(1.3);
+        }
+
+        /* Label de região de surto */
+        .outbreak-label {
+            z-index: 1000;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -507,6 +537,7 @@
 
         let heatLayer = null;
         let markersLayer = L.layerGroup().addTo(map);
+        let outbreakAreasLayer = L.layerGroup().addTo(map);
         let allData = [];
         let currentFilter = 'all';
 
@@ -579,11 +610,56 @@
             }
         }
 
+        function groupDataByRegion(data) {
+            const regions = {};
+            data.forEach(point => {
+                const region = point.region;
+                if (!regions[region]) {
+                    regions[region] = {
+                        points: [],
+                        hasOutbreak: false
+                    };
+                }
+                regions[region].points.push(point);
+                if (point.region_outbreak) {
+                    regions[region].hasOutbreak = true;
+                }
+            });
+            return regions;
+        }
+
+        function calculateCentroid(points) {
+            const sum = points.reduce((acc, point) => {
+                acc.lat += point.lat;
+                acc.lng += point.lng;
+                return acc;
+            }, { lat: 0, lng: 0 });
+
+            return {
+                lat: sum.lat / points.length,
+                lng: sum.lng / points.length
+            };
+        }
+
+        function calculateRadius(points, centroid) {
+            let maxDistance = 0;
+            points.forEach(point => {
+                const distance = Math.sqrt(
+                    Math.pow(point.lat - centroid.lat, 2) +
+                    Math.pow(point.lng - centroid.lng, 2)
+                );
+                maxDistance = Math.max(maxDistance, distance);
+            });
+            // Adicionar margem de 20% e converter para metros aproximados
+            return (maxDistance * 111000 * 1.3); // 1 grau ≈ 111km, +30% de margem
+        }
+
         function updateStatistics(data) {
             const totalCases = data.length;
-            const outbreakCount = data.filter(p => p.region_outbreak).length;
+            const outbreakRegions = new Set(data.filter(p => p.region_outbreak).map(p => p.region));
+            const outbreakCount = outbreakRegions.size;
             const criticalCases = data.filter(p => p.intensity >= 15000).length;
-            const avgIntensity = data.length > 0 ? 
+            const avgIntensity = data.length > 0 ?
                 (data.reduce((sum, p) => sum + p.intensity, 0) / data.length).toFixed(0) : 0;
 
             document.getElementById('total-cases').textContent = totalCases.toLocaleString();
@@ -609,101 +685,208 @@
                 map.removeLayer(heatLayer);
             }
             markersLayer.clearLayers();
+            outbreakAreasLayer.clearLayers();
 
             // Update statistics
             updateStatistics(filteredData);
 
-            // Prepare heat data with distinct intensity mapping
-            const heatData = filteredData.map(point => {
-                let normalizedIntensity;
-                
-                if (point.region_outbreak) {
-                    normalizedIntensity = 1.0; // Max intensity for outbreaks
-                } else if (point.intensity >= 15000) {
-                    normalizedIntensity = 0.75; // Critical
-                } else if (point.intensity >= 10000) {
-                    normalizedIntensity = 0.55; // High
-                } else if (point.intensity >= 5000) {
-                    normalizedIntensity = 0.35;  // Normal/Attention
+            // Agrupar dados por região
+            const regionGroups = groupDataByRegion(filteredData);
+
+            // Separar dados por tipo de região
+            const outbreakData = [];
+            const normalData = [];
+
+            Object.entries(regionGroups).forEach(([region, data]) => {
+                if (data.hasOutbreak) {
+                    outbreakData.push(...data.points);
                 } else {
-                    normalizedIntensity = 0.15;  // Low/Normal
+                    normalData.push(...data.points);
                 }
-                
-                return [point.lat, point.lng, normalizedIntensity];
             });
 
-            // Create heat layer with distinct color progression
-            heatLayer = L.heatLayer(heatData, {
-                radius: 35,
-                blur: 20,
-                maxZoom: 10,
-                max: 1.0,
-                gradient: {
-                    0.0: 'rgba(34, 197, 94, 0.5)',   // Verde transparente
-                    0.25: 'rgba(234, 179, 8, 0.6)',  // Amarelo
-                    0.45: 'rgba(249, 115, 22, 0.7)', // Laranja
-                    0.65: 'rgba(220, 38, 38, 0.8)',  // Vermelho
-                    0.85: 'rgba(124, 45, 18, 0.9)',  // Marrom escuro
-                    1.0: 'rgba(76, 29, 149, 1.0)'    // Roxo escuro para surtos críticos
-                }
-            }).addTo(map);
+            // 1. Criar heatmap apenas para regiões normais (sem surto)
+            if (normalData.length > 0) {
+                const heatData = normalData.map(point => {
+                    let normalizedIntensity;
 
-            // Add enhanced markers with distinct styling for outbreaks
-            filteredData.forEach(point => {
-                const markerColor = getColorByIntensity(point.intensity, point.region_outbreak);
-                const isOutbreak = point.region_outbreak;
-                
-                const marker = L.circleMarker([point.lat, point.lng], {
-                    radius: isOutbreak ? 12 : 7,
-                    fillColor: markerColor,
-                    color: isOutbreak ? '#fbbf24' : '#ffffff', // Borda dourada para surtos
-                    weight: isOutbreak ? 5 : 3,
-                    opacity: 1,
-                    fillOpacity: isOutbreak ? 0.95 : 0.8,
-                    className: isOutbreak ? 'outbreak-marker' : 'normal-marker'
+                    if (point.intensity >= 15000) {
+                        normalizedIntensity = 0.75; // Critical
+                    } else if (point.intensity >= 10000) {
+                        normalizedIntensity = 0.55; // High
+                    } else if (point.intensity >= 5000) {
+                        normalizedIntensity = 0.35;  // Normal/Attention
+                    } else {
+                        normalizedIntensity = 0.15;  // Low/Normal
+                    }
+
+                    return [point.lat, point.lng, normalizedIntensity];
                 });
 
-                // Enhanced popup with distinct styling for outbreaks
-                const statusBadge = isOutbreak
-                    ? '<span class="status-badge status-outbreak">⚠️ SURTO ATIVO</span>'
-                    : '<span class="status-badge status-normal">✓ Normal</span>';
+                heatLayer = L.heatLayer(heatData, {
+                    radius: 35,
+                    blur: 20,
+                    maxZoom: 10,
+                    max: 1.0,
+                    gradient: {
+                        0.0: 'rgba(34, 197, 94, 0.4)',   // Verde transparente
+                        0.25: 'rgba(234, 179, 8, 0.5)',  // Amarelo
+                        0.45: 'rgba(249, 115, 22, 0.6)', // Laranja
+                        0.65: 'rgba(220, 38, 38, 0.7)',  // Vermelho
+                        1.0: 'rgba(185, 28, 28, 0.8)'    // Vermelho mais escuro
+                    }
+                }).addTo(map);
 
-                const intensityLevel = point.intensity < 5000 ? 'Normal' :
-                                     point.intensity < 10000 ? 'Atenção' :
-                                     point.intensity < 15000 ? 'Alto' : 'Crítico';
+                // Adicionar marcadores para regiões normais
+                normalData.forEach(point => {
+                    const markerColor = getColorByIntensity(point.intensity, false);
 
-                marker.bindPopup(`
-                    <div>
-                        <h4 class="popup-header" style="border-color: ${markerColor};">
-                            ${isOutbreak ? '⚠️ ' : ''}Região ${point.region}
-                        </h4>
-                        <div class="popup-row">
-                            <span class="popup-label">Status:</span>
-                            ${statusBadge}
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Leucócitos:</span>
-                            <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Nível:</span>
-                            <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${isOutbreak ? 'SURTO' : intensityLevel}</span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Casos (7d):</span>
-                            <span class="popup-value">${point.region_case_count || 0}</span>
-                        </div>
-                        <div class="popup-row">
-                            <span class="popup-label">Última atualização:</span>
-                            <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
-                        </div>
-                    </div>
-                `);
+                    const marker = L.circleMarker([point.lat, point.lng], {
+                        radius: 5,
+                        fillColor: markerColor,
+                        color: '#ffffff',
+                        weight: 2,
+                        opacity: 0.9,
+                        fillOpacity: 0.7,
+                        className: 'normal-marker'
+                    });
 
-                marker.addTo(markersLayer);
+                    const intensityLevel = point.intensity < 5000 ? 'Normal' :
+                                         point.intensity < 10000 ? 'Atenção' :
+                                         point.intensity < 15000 ? 'Alto' : 'Crítico';
+
+                    marker.bindPopup(`
+                        <div>
+                            <h4 class="popup-header" style="border-color: ${markerColor};">
+                                Região ${point.region}
+                            </h4>
+                            <div class="popup-row">
+                                <span class="popup-label">Status:</span>
+                                <span class="status-badge status-normal">✓ Normal</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Leucócitos:</span>
+                                <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Nível:</span>
+                                <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${intensityLevel}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Casos (7d):</span>
+                                <span class="popup-value">${point.region_case_count || 0}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Última atualização:</span>
+                                <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
+                            </div>
+                        </div>
+                    `);
+
+                    marker.addTo(markersLayer);
+                });
+            }
+
+            // 2. Criar áreas delimitadas para surtos com pontos individuais
+            Object.entries(regionGroups).forEach(([region, data]) => {
+                if (!data.hasOutbreak) return;
+
+                const points = data.points;
+
+                // Calcular centroide e raio da área de surto
+                const centroid = calculateCentroid(points);
+                const radius = calculateRadius(points, centroid);
+
+                // Criar círculo delimitador da área de surto
+                const outbreakArea = L.circle([centroid.lat, centroid.lng], {
+                    radius: radius,
+                    fillColor: '#7c2d12',
+                    fillOpacity: 0.08,
+                    color: '#fbbf24',
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '10, 10',  // Linha pontilhada
+                    className: 'outbreak-area'
+                });
+
+                // Adicionar label da região no centro
+                const regionLabel = L.marker([centroid.lat, centroid.lng], {
+                    icon: L.divIcon({
+                        className: 'outbreak-label',
+                        html: `<div style="
+                            background: rgba(124, 45, 18, 0.95);
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            font-weight: 700;
+                            font-size: 13px;
+                            border: 3px solid #fbbf24;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            white-space: nowrap;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        ">⚠️ SURTO - Região ${region}</div>`,
+                        iconSize: [200, 40],
+                        iconAnchor: [100, 20]
+                    }),
+                    interactive: false
+                });
+
+                outbreakArea.addTo(outbreakAreasLayer);
+                regionLabel.addTo(outbreakAreasLayer);
+
+                // Adicionar pontos individuais dentro da área de surto
+                points.forEach(point => {
+                    // Cor baseada no nível de leucócitos individual
+                    const markerColor = getColorByIntensity(point.intensity, false);
+
+                    const marker = L.circleMarker([point.lat, point.lng], {
+                        radius: 8,
+                        fillColor: markerColor,
+                        color: '#ffffff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9,
+                        className: 'outbreak-point'
+                    });
+
+                    const intensityLevel = point.intensity < 5000 ? 'Normal' :
+                                         point.intensity < 10000 ? 'Atenção' :
+                                         point.intensity < 15000 ? 'Alto' : 'Crítico';
+
+                    marker.bindPopup(`
+                        <div>
+                            <h4 class="popup-header" style="border-color: #7c2d12; background: linear-gradient(135deg, rgba(124, 45, 18, 0.15), rgba(76, 29, 149, 0.1));">
+                                ⚠️ Região ${point.region} - SURTO
+                            </h4>
+                            <div class="popup-row">
+                                <span class="popup-label">Status da Região:</span>
+                                <span class="status-badge status-outbreak">⚠️ SURTO ATIVO</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Leucócitos (este ponto):</span>
+                                <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Nível deste ponto:</span>
+                                <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${intensityLevel}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Total de casos na região (7d):</span>
+                                <span class="popup-value">${point.region_case_count || 0}</span>
+                            </div>
+                            <div class="popup-row">
+                                <span class="popup-label">Última atualização:</span>
+                                <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
+                            </div>
+                        </div>
+                    `);
+
+                    marker.addTo(markersLayer);
+                });
             });
 
-            console.log(`Exibindo ${filteredData.length} de ${allData.length} pontos`);
+            console.log(`Exibindo ${filteredData.length} pontos (${outbreakData.length} em surtos, ${normalData.length} normais)`);
         }
 
         function loadHeatmapData() {
