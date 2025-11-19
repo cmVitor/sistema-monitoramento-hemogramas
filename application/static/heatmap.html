@@ -810,7 +810,7 @@
                             white-space: nowrap;
                             text-transform: uppercase;
                             letter-spacing: 0.5px;
-                        ">⚠️ SURTO - Região ${region} (${outbreakInfo.point_count} casos)</div>`,
+                        ">⚠️ SURTO - (${outbreakInfo.point_count} casos)</div>`,
                         iconSize: [200, 40],
                         iconAnchor: [100, 20]
                     }),
@@ -889,11 +889,137 @@
                 });
         }
 
-        // Initial load
+        // WebSocket para atualizações em tempo real
+        let ws = null;
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 10;
+        let reconnectDelay = 1000; // Start with 1 second
+        let heartbeatInterval = null;
+        let isConnected = false;
+
+        function connectWebSocket() {
+            // Determine WebSocket protocol based on current page protocol
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            console.log('Conectando ao WebSocket em tempo real...');
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('✓ Conexão WebSocket estabelecida - atualizações em tempo real ativas');
+                isConnected = true;
+                reconnectAttempts = 0;
+                reconnectDelay = 1000;
+
+                // Send heartbeat every 25 seconds to keep connection alive
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                }
+                heartbeatInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'heartbeat' }));
+                    }
+                }, 25000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (error) {
+                    console.error('Erro ao processar mensagem WebSocket:', error);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('Erro no WebSocket:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('Conexão WebSocket fechada');
+                isConnected = false;
+
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                }
+
+                // Attempt to reconnect with exponential backoff
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    const delay = Math.min(reconnectDelay * Math.pow(1.5, reconnectAttempts), 30000);
+                    console.log(`Tentando reconectar em ${delay/1000}s... (tentativa ${reconnectAttempts}/${maxReconnectAttempts})`);
+                    setTimeout(connectWebSocket, delay);
+                } else {
+                    console.warn('Número máximo de tentativas de reconexão atingido. Usando apenas polling.');
+                }
+            };
+        }
+
+        function handleWebSocketMessage(message) {
+            console.log('Mensagem WebSocket recebida:', message.type);
+
+            switch (message.type) {
+                case 'new_observation':
+                    console.log('Nova observação recebida em tempo real:', message.data);
+                    // Reload full data to ensure consistency
+                    loadHeatmapData();
+                    break;
+
+                case 'outbreak_alert':
+                    console.warn('⚠️ ALERTA DE SURTO DETECTADO:', message.data);
+                    // Show browser notification if permitted
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('Alerta de Surto Detectado!', {
+                            body: `Região: ${message.data.region}\n${message.data.summary}`,
+                            icon: '/static/alert-icon.png',
+                            requireInteraction: true
+                        });
+                    }
+                    // Reload full data to show new outbreak
+                    loadHeatmapData();
+                    break;
+
+                case 'refresh_data':
+                    console.log('Atualização completa de dados solicitada');
+                    loadHeatmapData();
+                    break;
+
+                case 'ping':
+                    // Server ping - respond with pong
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'pong' }));
+                    }
+                    break;
+
+                default:
+                    console.log('Tipo de mensagem desconhecido:', message.type);
+            }
+        }
+
+        // Request notification permission on page load
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('✓ Notificações de alerta habilitadas');
+                }
+            });
+        }
+
+        // Initial data load
         loadHeatmapData();
 
-        // Auto-refresh every 30 seconds
-        setInterval(loadHeatmapData, 30000);
+        // Connect WebSocket for real-time updates
+        connectWebSocket();
+
+        // Fallback: Polling every 60 seconds (reduced from 30s since we have WebSocket)
+        // This serves as backup in case WebSocket connection fails
+        setInterval(() => {
+            if (!isConnected) {
+                console.log('WebSocket não conectado, usando polling como fallback');
+                loadHeatmapData();
+            }
+        }, 60000);
     </script>
 </body>
 </html>
