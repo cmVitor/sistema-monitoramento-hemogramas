@@ -107,31 +107,6 @@
             border: 2px solid rgba(255, 255, 255, 0.8);
         }
 
-        .legend-gradient {
-            height: 24px;
-            border-radius: 12px;
-            margin: 12px 0;
-            background: linear-gradient(90deg, 
-                #22c55e 0%,    /* Verde - Normal */
-                #eab308 20%,   /* Amarelo - Atenção */
-                #f97316 40%,   /* Laranja - Alto */
-                #dc2626 60%,   /* Vermelho - Crítico */
-                #7c2d12 80%,   /* Marrom escuro - Surto */
-                #4c1d95 100%   /* Roxo escuro - Surto crítico */
-            );
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.8);
-        }
-
-        .legend-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #6b7280;
-            margin-top: 8px;
-            font-weight: 600;
-        }
-
         /* Filter Options */
         .filter-section {
             margin-top: 15px;
@@ -406,34 +381,26 @@
             </div>
             <div id="legend" class="collapsible-content">
                 <div class="legend">
-                    <div class="legend-gradient"></div>
-                    <div class="legend-labels">
-                        <span>Normal</span>
-                        <span>Atenção</span>
-                        <span>Alto</span>
-                        <span>Crítico</span>
-                        <span>Surto</span>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #22c55e;"></div>
+                        <span>0 - 5.000 leucócitos (Normal)</span>
                     </div>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #22c55e;"></div>
-                    <span>0 - 5.000 leucócitos (Normal)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #eab308;"></div>
-                    <span>5.000 - 10.000 leucócitos (Atenção)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #f97316;"></div>
-                    <span>10.000 - 15.000 leucócitos (Alto)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #dc2626;"></div>
-                    <span>15.000+ leucócitos (Crítico)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #7c2d12, #4c1d95); border-color: #fbbf24; border-width: 3px;"></div>
-                    <span>Região com surto ativo ⚠️</span>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #eab308;"></div>
+                        <span>5.000 - 10.000 leucócitos (Atenção)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f97316;"></div>
+                        <span>10.000 - 15.000 leucócitos (Alto)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #dc2626;"></div>
+                        <span>15.000+ leucócitos (Crítico)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #7c2d12, #4c1d95); border-color: #fbbf24; border-width: 3px;"></div>
+                        <span>Região com surto ativo ⚠️</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -519,8 +486,6 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Heat Plugin -->
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
     <script>
         // Initialize map centered on Brazil
@@ -535,7 +500,6 @@
             maxZoom: 18
         }).addTo(map);
 
-        let heatLayer = null;
         let markersLayer = L.layerGroup().addTo(map);
         let outbreakAreasLayer = L.layerGroup().addTo(map);
         let allData = [];
@@ -569,7 +533,7 @@
                 this.querySelector('input[type="radio"]').checked = true;
 
                 currentFilter = this.dataset.filter;
-                updateHeatmap();
+                updateMap();
             });
         });
 
@@ -629,9 +593,6 @@
             return regions;
         }
 
-        // Funções de cálculo movidas para o backend (services/geospatial.py)
-        // Backend agora retorna centroid e radius pré-calculados
-
         function updateStatistics(data) {
             const totalCases = data.length;
             const outbreakRegions = new Set(data.filter(p => p.region_outbreak).map(p => p.region));
@@ -655,13 +616,10 @@
             }
         }
 
-        function updateHeatmap() {
+        function updateMap() {
             const filteredData = filterDataByIntensity(allData, currentFilter);
 
             // Remove old layers
-            if (heatLayer) {
-                map.removeLayer(heatLayer);
-            }
             markersLayer.clearLayers();
             outbreakAreasLayer.clearLayers();
 
@@ -683,90 +641,56 @@
                 }
             });
 
-            // 1. Criar heatmap apenas para regiões normais (sem surto)
-            if (normalData.length > 0) {
-                const heatData = normalData.map(point => {
-                    let normalizedIntensity;
+            // 1. Adicionar marcadores para regiões normais (sem surto)
+            normalData.forEach(point => {
+                const markerColor = getColorByIntensity(point.intensity, false);
 
-                    if (point.intensity >= 15000) {
-                        normalizedIntensity = 0.75; // Critical
-                    } else if (point.intensity >= 10000) {
-                        normalizedIntensity = 0.55; // High
-                    } else if (point.intensity >= 5000) {
-                        normalizedIntensity = 0.35;  // Normal/Attention
-                    } else {
-                        normalizedIntensity = 0.15;  // Low/Normal
-                    }
-
-                    return [point.lat, point.lng, normalizedIntensity];
+                const marker = L.circleMarker([point.lat, point.lng], {
+                    radius: 6,
+                    fillColor: markerColor,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.9,
+                    fillOpacity: 0.8,
+                    className: 'normal-marker'
                 });
 
-                heatLayer = L.heatLayer(heatData, {
-                    radius: 35,
-                    blur: 20,
-                    maxZoom: 10,
-                    max: 1.0,
-                    gradient: {
-                        0.0: 'rgba(34, 197, 94, 0.4)',   // Verde transparente
-                        0.25: 'rgba(234, 179, 8, 0.5)',  // Amarelo
-                        0.45: 'rgba(249, 115, 22, 0.6)', // Laranja
-                        0.65: 'rgba(220, 38, 38, 0.7)',  // Vermelho
-                        1.0: 'rgba(185, 28, 28, 0.8)'    // Vermelho mais escuro
-                    }
-                }).addTo(map);
+                const intensityLevel = point.intensity < 5000 ? 'Normal' :
+                                     point.intensity < 10000 ? 'Atenção' :
+                                     point.intensity < 15000 ? 'Alto' : 'Crítico';
 
-                // Adicionar marcadores para regiões normais
-                normalData.forEach(point => {
-                    const markerColor = getColorByIntensity(point.intensity, false);
-
-                    const marker = L.circleMarker([point.lat, point.lng], {
-                        radius: 5,
-                        fillColor: markerColor,
-                        color: '#ffffff',
-                        weight: 2,
-                        opacity: 0.9,
-                        fillOpacity: 0.7,
-                        className: 'normal-marker'
-                    });
-
-                    const intensityLevel = point.intensity < 5000 ? 'Normal' :
-                                         point.intensity < 10000 ? 'Atenção' :
-                                         point.intensity < 15000 ? 'Alto' : 'Crítico';
-
-                    marker.bindPopup(`
-                        <div>
-                            <h4 class="popup-header" style="border-color: ${markerColor};">
-                                Região ${point.region}
-                            </h4>
-                            <div class="popup-row">
-                                <span class="popup-label">Status:</span>
-                                <span class="status-badge status-normal">✓ Normal</span>
-                            </div>
-                            <div class="popup-row">
-                                <span class="popup-label">Leucócitos:</span>
-                                <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
-                            </div>
-                            <div class="popup-row">
-                                <span class="popup-label">Nível:</span>
-                                <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${intensityLevel}</span>
-                            </div>
-                            <div class="popup-row">
-                                <span class="popup-label">Casos (7d):</span>
-                                <span class="popup-value">${point.region_case_count || 0}</span>
-                            </div>
-                            <div class="popup-row">
-                                <span class="popup-label">Última atualização:</span>
-                                <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
-                            </div>
+                marker.bindPopup(`
+                    <div>
+                        <h4 class="popup-header" style="border-color: ${markerColor};">
+                            Região ${point.region}
+                        </h4>
+                        <div class="popup-row">
+                            <span class="popup-label">Status:</span>
+                            <span class="status-badge status-normal">✓ Normal</span>
                         </div>
-                    `);
+                        <div class="popup-row">
+                            <span class="popup-label">Leucócitos:</span>
+                            <span class="popup-value">${point.intensity ? point.intensity.toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Nível:</span>
+                            <span class="popup-value" style="color: ${markerColor}; font-weight: 800;">${intensityLevel}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Casos (7d):</span>
+                            <span class="popup-value">${point.region_case_count || 0}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Última atualização:</span>
+                            <span class="popup-value">${point.received_at ? new Date(point.received_at).toLocaleString('pt-BR') : 'N/A'}</span>
+                        </div>
+                    </div>
+                `);
 
-                    marker.addTo(markersLayer);
-                });
-            }
+                marker.addTo(markersLayer);
+            });
 
             // 2. Criar áreas delimitadas para surtos com pontos individuais
-            // AGORA USA DADOS PRÉ-CALCULADOS DO BACKEND
             Object.entries(regionGroups).forEach(([region, data]) => {
                 if (!data.hasOutbreak) return;
 
@@ -881,11 +805,11 @@
                     // Backend agora retorna { observations: [], outbreaks: {} }
                     allData = data.observations || [];
                     outbreakRegions = data.outbreaks || {};
-                    updateHeatmap();
-                    console.log(`Carregados ${allData.length} pontos para o mapa de calor`);
+                    updateMap();
+                    console.log(`Carregados ${allData.length} pontos para o mapa`);
                 })
                 .catch(error => {
-                    console.error('Erro ao carregar dados do mapa de calor:', error);
+                    console.error('Erro ao carregar dados do mapa:', error);
                 });
         }
 
