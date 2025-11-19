@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from typing import List, Any, Dict
 import os
 import time
+import asyncio
 
 from .db import SessionLocal, engine, Base
 from .models import HemogramObservation, AlertCommunication
@@ -20,6 +21,7 @@ from .utils.fhir_utils import (
     anonymize_observation
 )
 from .services.analysis import evaluate_and_create_alert_if_needed
+from .services.websocket_manager import manager as ws_manager
 
 # Create tables with retry logic
 max_retries = 5
@@ -74,8 +76,31 @@ def root():
     return FileResponse(os.path.join(static_path, "heatmap.html"))
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint para atualizações em tempo real.
+    Envia notificações de novas observações e alertas de surtos.
+    """
+    await ws_manager.connect(websocket)
+    try:
+        # Keep connection alive and listen for messages (heartbeat)
+        while True:
+            # Wait for any message from client (used as heartbeat)
+            try:
+                await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send ping to check if connection is still alive
+                await websocket.send_text('{"type":"ping"}')
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        ws_manager.disconnect(websocket)
+
+
 @app.post("/observations", response_model=HemogramOut)
-def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
+async def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
     data: Dict[str, Any] = obs.model_dump()
     if data.get("resourceType") != "Observation":
         raise HTTPException(status_code=400, detail="Expected FHIR Observation")
@@ -102,7 +127,28 @@ def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
     db.refresh(record)
 
     # After saving, evaluate for alerts for that region
-    evaluate_and_create_alert_if_needed(db, region_ibge_code)
+    alert = evaluate_and_create_alert_if_needed(db, region_ibge_code)
+
+    # Send WebSocket notification for new observation
+    observation_data = {
+        "id": record.id,
+        "region": record.region_ibge_code,
+        "leukocytes": record.leukocytes,
+        "latitude": record.latitude,
+        "longitude": record.longitude,
+        "received_at": record.received_at.isoformat() if record.received_at else None
+    }
+    await ws_manager.send_new_observation_event(observation_data)
+
+    # Send WebSocket notification if alert was created
+    if alert:
+        alert_data = {
+            "id": alert.id,
+            "region": alert.region_ibge_code,
+            "summary": alert.summary,
+            "created_at": alert.created_at.isoformat() if alert.created_at else None
+        }
+        await ws_manager.send_outbreak_alert_event(alert_data)
 
     return HemogramOut(
         id=record.id,
@@ -196,11 +242,14 @@ def get_heatmap_data(db: Session = Depends(get_db)):
 
 
 @app.post("/seed-data")
-def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
+async def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
     """
     Generate synthetic test data for demonstration purposes.
-    Creates 3000+ hemogram observations distributed across Brazil,
+    Creates hemogram observations distributed across Brazil,
     with specific patterns in Goiás to trigger an alert.
+
+    NOW GENERATES IN REAL-TIME: Each observation is created with 0.5s interval
+    to allow real-time visualization on the heatmap.
 
     Query params:
         count: Total number of observations to generate (default: 3000)
@@ -222,11 +271,15 @@ def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
         other_elevated_percentage=0.15  # 15% elevated in other regions (normal)
     )
 
-    # Insert all observations into database
+    # Insert observations one by one with real-time updates
     inserted_count = 0
     region_counts: Dict[str, int] = {}
+    alerts_created = []
+    regions_checked_for_alerts = set()
 
-    for obs_data in observations:
+    print(f"Iniciando geração em tempo real de {count} observações...")
+
+    for i, obs_data in enumerate(observations):
         region_ibge_code = extract_region_ibge_code(obs_data) or "unknown"
         leukocytes = extract_leukocytes(obs_data)
         latitude = extract_latitude(obs_data)
@@ -251,28 +304,79 @@ def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
             record.received_at = dateparser.parse(obs_data["effectiveDateTime"])
 
         db.add(record)
-        inserted_count += 1
+        db.commit()  # Commit immediately to make it available
+        db.refresh(record)
 
-        # Track counts per region
+        inserted_count += 1
         region_counts[region_ibge_code] = region_counts.get(region_ibge_code, 0) + 1
 
-    db.commit()
+        # Send WebSocket notification for new observation
+        observation_data = {
+            "id": record.id,
+            "region": record.region_ibge_code,
+            "leukocytes": record.leukocytes,
+            "latitude": record.latitude,
+            "longitude": record.longitude,
+            "received_at": record.received_at.isoformat() if record.received_at else None
+        }
+        await ws_manager.send_new_observation_event(observation_data)
 
-    # Evaluate alerts for all regions
-    alerts_created = []
+        # Check for alerts every 50 observations or when we have enough data from a region
+        if (i + 1) % 50 == 0 or region_counts[region_ibge_code] >= 20:
+            if region_ibge_code not in regions_checked_for_alerts:
+                alert = evaluate_and_create_alert_if_needed(db, region_ibge_code)
+                if alert:
+                    alerts_created.append({
+                        "region": region_ibge_code,
+                        "summary": alert.summary,
+                        "id": alert.id
+                    })
+                    # Send WebSocket notification for outbreak alert
+                    alert_data = {
+                        "id": alert.id,
+                        "region": alert.region_ibge_code,
+                        "summary": alert.summary,
+                        "created_at": alert.created_at.isoformat() if alert.created_at else None
+                    }
+                    await ws_manager.send_outbreak_alert_event(alert_data)
+                    regions_checked_for_alerts.add(region_ibge_code)
+
+        # Wait 0.5 seconds before next observation for real-time visualization
+        await asyncio.sleep(0.05)
+
+        # Log progress every 100 observations
+        if (i + 1) % 100 == 0:
+            print(f"Progresso: {i + 1}/{count} observações geradas")
+
+    # Final check for alerts on all regions
+    print("Verificação final de alertas em todas as regiões...")
     unique_regions = set(region_counts.keys())
 
     for region_code in unique_regions:
-        alert = evaluate_and_create_alert_if_needed(db, region_code)
-        if alert:
-            alerts_created.append({
-                "region": region_code,
-                "summary": alert.summary,
-                "id": alert.id
-            })
+        if region_code not in regions_checked_for_alerts:
+            alert = evaluate_and_create_alert_if_needed(db, region_code)
+            if alert:
+                alerts_created.append({
+                    "region": region_code,
+                    "summary": alert.summary,
+                    "id": alert.id
+                })
+                # Send WebSocket notification for outbreak alert
+                alert_data = {
+                    "id": alert.id,
+                    "region": alert.region_ibge_code,
+                    "summary": alert.summary,
+                    "created_at": alert.created_at.isoformat() if alert.created_at else None
+                }
+                await ws_manager.send_outbreak_alert_event(alert_data)
 
     # Get detailed stats for Goiás
     goias_stats = compute_region_stats(db, "5208707")
+
+    # Send final WebSocket notification to refresh all data
+    await ws_manager.send_data_refresh_event()
+
+    print(f"✓ Geração em tempo real concluída: {inserted_count} observações, {len(alerts_created)} alertas")
 
     return {
         "status": "success",
@@ -282,6 +386,6 @@ def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
         "alerts_created": len(alerts_created),
         "alerts": alerts_created,
         "goias_stats": goias_stats,
-        "message": f"Successfully generated {inserted_count} hemogram observations. "
+        "message": f"Successfully generated {inserted_count} hemogram observations in real-time. "
                    f"Created {len(alerts_created)} alert(s)."
     }
