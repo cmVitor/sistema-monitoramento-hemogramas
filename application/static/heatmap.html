@@ -539,6 +539,7 @@
         let markersLayer = L.layerGroup().addTo(map);
         let outbreakAreasLayer = L.layerGroup().addTo(map);
         let allData = [];
+        let outbreakRegions = {}; // Computed by backend with centroid, radius, phone numbers
         let currentFilter = 'all';
 
         // Distinct color scheme with clear differentiation
@@ -628,31 +629,8 @@
             return regions;
         }
 
-        function calculateCentroid(points) {
-            const sum = points.reduce((acc, point) => {
-                acc.lat += point.lat;
-                acc.lng += point.lng;
-                return acc;
-            }, { lat: 0, lng: 0 });
-
-            return {
-                lat: sum.lat / points.length,
-                lng: sum.lng / points.length
-            };
-        }
-
-        function calculateRadius(points, centroid) {
-            let maxDistance = 0;
-            points.forEach(point => {
-                const distance = Math.sqrt(
-                    Math.pow(point.lat - centroid.lat, 2) +
-                    Math.pow(point.lng - centroid.lng, 2)
-                );
-                maxDistance = Math.max(maxDistance, distance);
-            });
-            // Adicionar margem de 20% e converter para metros aproximados
-            return (maxDistance * 111000 * 1.3); // 1 grau ≈ 111km, +30% de margem
-        }
+        // Funções de cálculo movidas para o backend (services/geospatial.py)
+        // Backend agora retorna centroid e radius pré-calculados
 
         function updateStatistics(data) {
             const totalCases = data.length;
@@ -788,14 +766,21 @@
             }
 
             // 2. Criar áreas delimitadas para surtos com pontos individuais
+            // AGORA USA DADOS PRÉ-CALCULADOS DO BACKEND
             Object.entries(regionGroups).forEach(([region, data]) => {
                 if (!data.hasOutbreak) return;
 
                 const points = data.points;
 
-                // Calcular centroide e raio da área de surto
-                const centroid = calculateCentroid(points);
-                const radius = calculateRadius(points, centroid);
+                // Usar centroid e radius calculados pelo backend
+                const outbreakInfo = outbreakRegions[region];
+                if (!outbreakInfo) {
+                    console.warn(`Dados de surto não encontrados para região ${region}`);
+                    return;
+                }
+
+                const centroid = outbreakInfo.centroid;
+                const radius = outbreakInfo.radius;
 
                 // Criar círculo delimitador da área de surto
                 const outbreakArea = L.circle([centroid.lat, centroid.lng], {
@@ -825,7 +810,7 @@
                             white-space: nowrap;
                             text-transform: uppercase;
                             letter-spacing: 0.5px;
-                        ">⚠️ SURTO - Região ${region}</div>`,
+                        ">⚠️ SURTO - Região ${region} (${outbreakInfo.point_count} casos)</div>`,
                         iconSize: [200, 40],
                         iconAnchor: [100, 20]
                     }),
@@ -893,9 +878,11 @@
             fetch('/heatmap-data')
                 .then(response => response.json())
                 .then(data => {
-                    allData = data;
+                    // Backend agora retorna { observations: [], outbreaks: {} }
+                    allData = data.observations || [];
+                    outbreakRegions = data.outbreaks || {};
                     updateHeatmap();
-                    console.log(`Carregados ${data.length} pontos para o mapa de calor`);
+                    console.log(`Carregados ${allData.length} pontos para o mapa de calor`);
                 })
                 .catch(error => {
                     console.error('Erro ao carregar dados do mapa de calor:', error);
