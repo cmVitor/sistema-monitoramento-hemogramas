@@ -134,8 +134,10 @@ def get_heatmap_data(db: Session = Depends(get_db)):
     Returns observation data for heatmap visualization.
     Filters out records without coordinates.
     Includes aggregated region statistics (case count and outbreak status).
+    ALL BUSINESS LOGIC CENTRALIZED HERE - frontend just renders.
     """
     from datetime import datetime, timedelta, timezone
+    from .services.geospatial import compute_outbreak_regions
 
     # Get observations with coordinates
     rows = db.execute(
@@ -173,18 +175,24 @@ def get_heatmap_data(db: Session = Depends(get_db)):
 
     region_outbreaks = set(alert_rows)
 
-    return [
-        {
-            "lat": row.latitude,
-            "lng": row.longitude,
-            "intensity": row.leukocytes if row.leukocytes else 1.0,
-            "region": row.region_ibge_code,
-            "received_at": row.received_at.isoformat() if row.received_at else None,
-            "region_case_count": region_counts.get(row.region_ibge_code, 0),
-            "region_outbreak": row.region_ibge_code in region_outbreaks
-        }
-        for row in rows
-    ]
+    # Compute outbreak geospatial data (centroid, radius, affected points)
+    outbreak_data = compute_outbreak_regions(db)
+
+    return {
+        "observations": [
+            {
+                "lat": row.latitude,
+                "lng": row.longitude,
+                "intensity": row.leukocytes if row.leukocytes else 1.0,
+                "region": row.region_ibge_code,
+                "received_at": row.received_at.isoformat() if row.received_at else None,
+                "region_case_count": region_counts.get(row.region_ibge_code, 0),
+                "region_outbreak": row.region_ibge_code in region_outbreaks
+            }
+            for row in rows
+        ],
+        "outbreaks": outbreak_data
+    }
 
 
 @app.post("/seed-data")
