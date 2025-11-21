@@ -1,0 +1,53 @@
+/**
+ * Status message component styles
+ */
+
+.status-message {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 3000;
+    background: var(--surface-white);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+    border-left: 5px solid var(--color-primary);
+    max-width: 400px;
+    display: none;
+    animation: slideIn var(--transition-normal);
+}
+
+.status-message.active {
+    display: block;
+}
+
+.status-message.success {
+    border-left-color: var(--color-success);
+}
+
+.status-message.error {
+    border-left-color: var(--color-danger);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.status-title {
+    font-weight: 800;
+    font-size: var(--font-size-lg);
+    margin-bottom: 8px;
+    color: #0f172a;
+}
+
+.status-text {
+    font-size: var(--font-size-base);
+    color: #475569;
+}

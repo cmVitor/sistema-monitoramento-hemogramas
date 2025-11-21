@@ -1,0 +1,63 @@
+/**
+ * Statistics component styles
+ */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.stat-item {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02));
+    padding: 16px;
+    border-radius: var(--radius-md);
+    text-align: center;
+    border: 2px solid rgba(37, 99, 235, 0.1);
+    transition: all var(--transition-fast);
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px -3px rgba(37, 99, 235, 0.1);
+}
+
+.stat-value {
+    font-size: var(--font-size-xl);
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+}
+
+.stat-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-top: var(--spacing-xs);
+    font-weight: 600;
+}
+
+/* Outbreak Alert */
+.outbreak-alert {
+    background: linear-gradient(135deg, rgba(124, 45, 18, 0.15), rgba(76, 29, 149, 0.1));
+    border: 2px solid rgba(124, 45, 18, 0.4);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.outbreak-icon {
+    color: var(--color-outbreak);
+    font-size: 18px;
+}
+
+.outbreak-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-outbreak);
+    font-weight: 600;
+}
