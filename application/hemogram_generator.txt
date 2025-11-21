@@ -1,6 +1,0 @@
-curl -X POST "http://localhost:8000/seed-data?count=1100"
-
-
-cd sistema-monitoramento-hemogramas/application
-docker-compose down -v
-docker-compose up -d
