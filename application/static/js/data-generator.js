@@ -15,8 +15,8 @@ export class DataGenerator {
     initialize() {
         const modal = document.getElementById('generateModal');
 
-        // Button click
-        document.getElementById('generateBtn').addEventListener('click', () => {
+        // Settings button click
+        document.getElementById('settingsBtn').addEventListener('click', () => {
             this.openModal();
         });
 
@@ -32,17 +32,40 @@ export class DataGenerator {
             this.closeModal();
         });
 
-        // Option clicks
-        document.querySelectorAll('.modal-option').forEach(option => {
-            option.addEventListener('click', () => {
-                const count = parseInt(option.dataset.count);
-                if (count) {
-                    this.generateData(count);
-                }
-            });
+        // Generate confirmation button
+        document.getElementById('generateConfirmBtn').addEventListener('click', () => {
+            this.handleGenerate();
+        });
+
+        // Allow Enter key to submit
+        document.getElementById('hemogramCount').addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                this.handleGenerate();
+            }
         });
 
         console.log('✓ Data generator initialized');
+    }
+
+    /**
+     * Handle generate button click with validation
+     */
+    handleGenerate() {
+        const input = document.getElementById('hemogramCount');
+        const count = parseInt(input.value);
+
+        // Validate input
+        if (isNaN(count) || count < 100 || count > 10000) {
+            this.showStatus(
+                'Valor Inválido',
+                'Por favor, digite um número entre 100 e 10.000.',
+                'error'
+            );
+            input.focus();
+            return;
+        }
+
+        this.generateData(count);
     }
 
     /**
@@ -84,9 +107,12 @@ export class DataGenerator {
     async generateData(count) {
         this.closeModal();
 
-        const generateBtn = document.getElementById('generateBtn');
+        const generateBtn = document.getElementById('generateConfirmBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+
         generateBtn.disabled = true;
         generateBtn.classList.add('loading');
+        settingsBtn.disabled = true;
 
         this.showStatus(
             'Gerando Dados...',
@@ -132,6 +158,7 @@ export class DataGenerator {
         } finally {
             generateBtn.disabled = false;
             generateBtn.classList.remove('loading');
+            settingsBtn.disabled = false;
         }
     }
 }
