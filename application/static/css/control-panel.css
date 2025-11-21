@@ -1,0 +1,89 @@
+/**
+ * Control panel component styles
+ */
+
+.control-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.panel-card {
+    background: var(--surface-white);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border-light);
+    min-width: 320px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.panel-title {
+    color: #0f172a;
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: var(--font-size-xl);
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    font-weight: bold;
+}
+
+.toggle-btn:hover {
+    color: var(--color-primary);
+    background: var(--surface-hover);
+}
+
+/* Collapsible sections */
+.collapsible-content {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height var(--transition-normal);
+}
+
+.collapsible-content.collapsed {
+    max-height: 0;
+}
+
+/* Legend */
+.legend {
+    margin-bottom: var(--spacing-lg);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin: var(--spacing-sm) 0;
+    font-size: var(--font-size-base);
+    color: #374151;
+    font-weight: 500;
+}
+
+.legend-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    margin-right: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+}
