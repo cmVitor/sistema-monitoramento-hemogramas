@@ -55,16 +55,49 @@ def get_heatmap_data(db: Session = Depends(get_db)):
     # Compute outbreak geospatial data (centroid, radius, affected points)
     outbreak_data = compute_outbreak_regions(db)
 
+    # Build set of outbreak observation IDs for fast lookup
+    outbreak_obs_ids = set()
+    outbreak_regions = {}
+
+    if outbreak_data and "outbreak" in outbreak_data:
+        outbreak_info = outbreak_data["outbreak"]
+        # Create a region identifier (using centroid as unique key)
+        region_key = f"outbreak_region_1"
+        outbreak_regions[region_key] = {
+            "centroid": outbreak_info["centroid"],
+            "radius": outbreak_info["radius"],
+            "point_count": outbreak_info["point_count"]
+        }
+
+        # Build set of outbreak coordinates for matching
+        outbreak_coords = {
+            (obs["lat"], obs["lng"])
+            for obs in outbreak_info["observations"]
+        }
+
+        # Map observation IDs to region
+        for row in rows:
+            if (row.latitude, row.longitude) in outbreak_coords:
+                outbreak_obs_ids.add(row.id)
+
+    # Build observation list with region info
+    observations = []
+    for row in rows:
+        is_in_outbreak = row.id in outbreak_obs_ids
+
+        obs = {
+            "lat": row.latitude,
+            "lng": row.longitude,
+            "intensity": row.leukocytes if row.leukocytes else 1.0,
+            "received_at": row.received_at.isoformat() if row.received_at else None,
+            "outbreak": has_recent_alerts,
+            "region": "outbreak_region_1" if is_in_outbreak else f"normal_region_{row.id}",
+            "region_outbreak": is_in_outbreak,
+            "region_case_count": outbreak_regions.get("outbreak_region_1", {}).get("point_count", 1) if is_in_outbreak else 1
+        }
+        observations.append(obs)
+
     return {
-        "observations": [
-            {
-                "lat": row.latitude,
-                "lng": row.longitude,
-                "intensity": row.leukocytes if row.leukocytes else 1.0,
-                "received_at": row.received_at.isoformat() if row.received_at else None,
-                "outbreak": has_recent_alerts
-            }
-            for row in rows
-        ],
-        "outbreaks": outbreak_data
+        "observations": observations,
+        "outbreaks": outbreak_regions
     }
