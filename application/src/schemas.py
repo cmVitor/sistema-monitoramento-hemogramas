@@ -21,14 +21,11 @@ class HemogramIn(BaseModel):
 
 class HemogramOut(BaseModel):
     id: int
-    region_ibge_code: str
     leukocytes: float | None
     latitude: float | None
     longitude: float | None
-    telefone: str | None
 
 class AlertOut(BaseModel):
     id: int
-    region_ibge_code: str
     summary: str
     fhir_communication: Any
