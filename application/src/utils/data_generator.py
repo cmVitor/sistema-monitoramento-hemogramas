@@ -123,16 +123,22 @@ def generate_bulk_test_data(
     other_elevated_percentage: float = 0.15
 ) -> List[Dict[str, Any]]:
     """
-    Generate bulk test data with specific characteristics.
+    Generate bulk test data with specific characteristics designed to trigger outbreak detection.
+
+    Outbreak Detection Strategy:
+    - Temporal surge: 90% of Goiás cases in last 24h vs 10% in previous 24h (~800% growth)
+    - High severity: 60%+ cases with elevated leukocytes in recent period
+    - Geographic concentration: 20% of all observations focused in Goiás
+    - Chronological ordering: Sorted by timestamp to simulate realistic outbreak progression
 
     Args:
         total_count: Total number of observations to generate
-        goias_percentage: Percentage of observations from concentrated area
+        goias_percentage: Percentage of observations from concentrated area (outbreak region)
         goias_elevated_percentage: Percentage of concentrated area observations with elevated leukocytes
-        other_elevated_percentage: Percentage of other observations with elevated leukocytes
+        other_elevated_percentage: Percentage of other observations with elevated leukocytes (baseline)
 
     Returns:
-        List of FHIR Observation dicts
+        List of FHIR Observation dicts, sorted chronologically (oldest to newest)
     """
     observations = []
 
@@ -140,15 +146,17 @@ def generate_bulk_test_data(
     concentrated_count = int(total_count * goias_percentage)
     other_count = total_count - concentrated_count
 
-    # Split concentrated area into two time periods to create 24h increase
-    concentrated_prev_24h_count = int(concentrated_count * 0.35)  # 35% in previous 24h
-    concentrated_last_24h_count = concentrated_count - concentrated_prev_24h_count  # 65% in last 24h (increase!)
+    # Split concentrated area into two time periods to create strong 24h increase
+    # Using 10%/90% split for ~800% growth, guaranteeing >20% threshold even with random insertion
+    concentrated_prev_24h_count = int(concentrated_count * 0.10)  # 10% in previous 24h
+    concentrated_last_24h_count = concentrated_count - concentrated_prev_24h_count  # 90% in last 24h (surge!)
 
     # Previous 24h (24-48 hours ago) - Concentrated area (Goiânia coordinates)
+    # This represents the baseline before the outbreak surge
     for i in range(concentrated_prev_24h_count):
         hours_ago = random.uniform(24, 48)
 
-        # Determine if elevated
+        # Determine if elevated (using base percentage)
         is_elevated = random.random() < goias_elevated_percentage
 
         if is_elevated:
@@ -167,16 +175,19 @@ def generate_bulk_test_data(
         )
         observations.append(obs)
 
-    # Last 24h (0-24 hours ago) - Concentrated area
+    # Last 24h (0-24 hours ago) - Concentrated area (OUTBREAK SURGE)
+    # This represents the recent outbreak with significantly elevated cases
     for i in range(concentrated_last_24h_count):
         hours_ago = random.uniform(0, 24)
 
-        # Determine if elevated (higher percentage for alert)
-        is_elevated = random.random() < goias_elevated_percentage
+        # Determine if elevated (using outbreak percentage - even higher than baseline)
+        # Adding +5% boost to ensure strong outbreak signal in recent period
+        outbreak_elevated_pct = min(goias_elevated_percentage + 0.05, 0.75)
+        is_elevated = random.random() < outbreak_elevated_pct
 
         if is_elevated:
-            # Elevated: 11000-20000
-            leukocytes = random.uniform(11000, 20000)
+            # Elevated: 11000-20000 (higher values more likely during outbreak)
+            leukocytes = random.uniform(11500, 20000)
         else:
             # Normal: 4000-10000
             leukocytes = random.uniform(4000, 10000)
@@ -215,7 +226,8 @@ def generate_bulk_test_data(
         )
         observations.append(obs)
 
-    # Shuffle to mix time periods
-    random.shuffle(observations)
+    # Sort by timestamp (oldest first) to simulate realistic temporal growth
+    # This ensures the surge pattern is maintained during incremental insertion
+    observations.sort(key=lambda obs: obs.get("effectiveDateTime", ""))
 
     return observations
