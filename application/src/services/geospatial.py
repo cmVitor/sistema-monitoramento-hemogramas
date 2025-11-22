@@ -66,90 +66,81 @@ def calculate_radius(points: List[Dict[str, float]], centroid: Dict[str, float])
 
 def compute_outbreak_regions(db: Session) -> Dict[str, Any]:
     """
-    Computes outbreak information for all regions with recent alerts.
+    Computes outbreak information based on recent alerts.
 
-    Returns a dictionary mapping region codes to outbreak data including:
+    Returns outbreak data including:
     - centroid (lat, lng)
     - radius (in meters)
     - point count
-    - affected phone numbers
+    - observations
 
     Args:
         db: Database session
 
     Returns:
-        Dict mapping region_ibge_code to outbreak data
+        Dict with outbreak data
     """
     from ..models import AlertCommunication
 
     now = datetime.now(timezone.utc)
     since_24h = now - timedelta(hours=24)
 
-    # Get regions with recent alerts (last 24 hours)
-    alert_regions = db.execute(
-        select(AlertCommunication.region_ibge_code.distinct())
+    # Check if there are recent alerts (last 24 hours)
+    recent_alerts = db.execute(
+        select(AlertCommunication)
         .where(AlertCommunication.created_at >= since_24h)
     ).scalars().all()
 
-    outbreak_data = {}
+    if not recent_alerts:
+        return {}
 
-    for region_code in alert_regions:
-        # Get all observations with coordinates for this region (last 7 days)
-        since_7d = now - timedelta(days=7)
-        observations = db.execute(
-            select(HemogramObservation)
-            .where(
-                HemogramObservation.region_ibge_code == region_code,
-                HemogramObservation.latitude.isnot(None),
-                HemogramObservation.longitude.isnot(None),
-                HemogramObservation.received_at >= since_7d
-            )
-        ).scalars().all()
+    # Get all observations with coordinates (last 7 days)
+    since_7d = now - timedelta(days=7)
+    observations = db.execute(
+        select(HemogramObservation)
+        .where(
+            HemogramObservation.latitude.isnot(None),
+            HemogramObservation.longitude.isnot(None),
+            HemogramObservation.received_at >= since_7d
+        )
+    ).scalars().all()
 
-        if not observations:
-            continue
+    if not observations:
+        return {}
 
-        # Convert to point list
-        points = [
-            {"lat": obs.latitude, "lng": obs.longitude}
+    # Convert to point list
+    points = [
+        {"lat": obs.latitude, "lng": obs.longitude}
+        for obs in observations
+    ]
+
+    # Calculate centroid and radius
+    centroid = calculate_centroid(points)
+    radius = calculate_radius(points, centroid)
+
+    outbreak_data = {
+        "centroid": centroid,
+        "radius": radius,
+        "point_count": len(points),
+        "observations": [
+            {
+                "lat": obs.latitude,
+                "lng": obs.longitude,
+                "leukocytes": obs.leukocytes,
+                "received_at": obs.received_at.isoformat() if obs.received_at else None
+            }
             for obs in observations
         ]
+    }
 
-        # Calculate centroid and radius
-        centroid = calculate_centroid(points)
-        radius = calculate_radius(points, centroid)
-
-        # Collect unique phone numbers
-        phone_numbers = set()
-        for obs in observations:
-            if obs.telefone:
-                phone_numbers.add(obs.telefone)
-
-        outbreak_data[region_code] = {
-            "centroid": centroid,
-            "radius": radius,
-            "point_count": len(points),
-            "phone_numbers": list(phone_numbers),
-            "observations": [
-                {
-                    "lat": obs.latitude,
-                    "lng": obs.longitude,
-                    "leukocytes": obs.leukocytes,
-                    "received_at": obs.received_at.isoformat() if obs.received_at else None
-                }
-                for obs in observations
-            ]
-        }
-
-    return outbreak_data
+    return {"outbreak": outbreak_data}
 
 
 def get_observations_within_radius(
     db: Session,
     center_lat: float,
     center_lng: float,
-    radius_meters: float,
-    exclude_region: Optional[str] = None
+    radius_meters: float
 ) -> List[HemogramObservation]:
     """
     Finds all observations within a geographic radius.
@@ -162,7 +153,6 @@ def get_observations_within_radius(
         center_lat: Center latitude
         center_lng: Center longitude
         radius_meters: Radius in meters
-        exclude_region: Optional region code to exclude from results
 
     Returns:
         List of HemogramObservation records within radius
@@ -175,9 +165,6 @@ def get_observations_within_radius(
         HemogramObservation.latitude.isnot(None),
         HemogramObservation.longitude.isnot(None)
     )
-
-    if exclude_region:
-        query = query.where(HemogramObservation.region_ibge_code != exclude_region)
 
     all_observations = db.execute(query).scalars().all()
 
