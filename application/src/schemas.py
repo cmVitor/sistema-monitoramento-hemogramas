@@ -29,3 +29,20 @@ class AlertOut(BaseModel):
     id: int
     summary: str
     fhir_communication: Any
+
+class MobileDeviceRegister(BaseModel):
+    device_id: str
+    fcm_token: str
+    platform: Literal["ios", "android"]
+
+class LocationUpdate(BaseModel):
+    device_id: str
+    latitude: float
+    longitude: float
+    timestamp: str
+
+class MobileDeviceOut(BaseModel):
+    device_id: str
+    platform: str
+    is_active: bool
+    registered_at: str
