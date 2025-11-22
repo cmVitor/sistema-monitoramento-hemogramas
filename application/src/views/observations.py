@@ -10,11 +10,9 @@ from ..db import SessionLocal
 from ..schemas import HemogramIn, HemogramOut
 from ..models import HemogramObservation
 from ..utils.fhir_utils import (
-    extract_region_ibge_code,
     extract_leukocytes,
     extract_latitude,
     extract_longitude,
-    extract_telefone,
     anonymize_observation
 )
 from ..services.analysis import evaluate_and_create_alert_if_needed
@@ -71,34 +69,29 @@ async def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
     if data.get("resourceType") != "Observation":
         raise HTTPException(status_code=400, detail="Expected FHIR Observation")
 
-    region_ibge_code = extract_region_ibge_code(data) or "unknown"
     leukocytes = extract_leukocytes(data)
     latitude = extract_latitude(data)
     longitude = extract_longitude(data)
-    telefone = extract_telefone(data)
 
     sanitized = anonymize_observation(data)
 
     record = HemogramObservation(
         fhir_id=data.get("id") or None,
-        region_ibge_code=region_ibge_code,
         leukocytes=leukocytes,
         latitude=latitude,
         longitude=longitude,
-        telefone=telefone,
         raw=sanitized,
     )
     db.add(record)
     db.commit()
     db.refresh(record)
 
-    # After saving, evaluate for alerts for that region
-    alert = evaluate_and_create_alert_if_needed(db, region_ibge_code)
+    # After saving, evaluate for alerts
+    alert = evaluate_and_create_alert_if_needed(db)
 
     # Send WebSocket notification for new observation
     observation_data = {
         "id": record.id,
-        "region": record.region_ibge_code,
         "leukocytes": record.leukocytes,
         "latitude": record.latitude,
         "longitude": record.longitude,
@@ -110,7 +103,6 @@ async def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
     if alert:
         alert_data = {
             "id": alert.id,
-            "region": alert.region_ibge_code,
             "summary": alert.summary,
             "created_at": alert.created_at.isoformat() if alert.created_at else None
         }
@@ -118,9 +110,7 @@ async def receive_observation(obs: HemogramIn, db: Session = Depends(get_db)):
 
     return HemogramOut(
         id=record.id,
-        region_ibge_code=record.region_ibge_code,
         leukocytes=record.leukocytes,
         latitude=record.latitude,
-        longitude=record.longitude,
-        telefone=record.telefone
+        longitude=record.longitude
     )
