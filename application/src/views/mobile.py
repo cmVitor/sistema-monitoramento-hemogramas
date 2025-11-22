@@ -91,7 +91,8 @@ async def update_location(
         timestamp = datetime.fromisoformat(location_data.timestamp.replace('Z', '+00:00'))
 
         # Update location and check for outbreak
-        device, should_alert = mobile_location_service.update_device_location(
+        # Returns: (device, should_alert, in_outbreak_zone)
+        device, should_alert, in_outbreak_zone = mobile_location_service.update_device_location(
             db=db,
             device_id=location_data.device_id,
             latitude=location_data.latitude,
@@ -105,26 +106,29 @@ async def update_location(
                 detail="Device not registered. Please register device first."
             )
 
-        # Send alert if device entered outbreak zone
+        # Send alert if device JUST entered outbreak zone (push notification)
+        alert_sent = False
         if should_alert:
-            logger.info(f"Sending outbreak alert to device {location_data.device_id}")
+            logger.info(f"Device {location_data.device_id} ENTERED outbreak zone - sending push notification")
             notification_service.send_outbreak_alert(
                 tokens=[device.fcm_token],
                 location_name="região próxima",
                 severity="medium"
             )
-            return {
-                "status": "success",
-                "message": "Location updated",
-                "alert_sent": True,
-                "in_outbreak_zone": True
-            }
+            alert_sent = True
 
+        # Log current status
+        if in_outbreak_zone:
+            logger.info(f"Device {location_data.device_id} is currently IN outbreak zone at ({location_data.latitude}, {location_data.longitude})")
+        else:
+            logger.debug(f"Device {location_data.device_id} is OUTSIDE outbreak zones")
+
+        # Always return current outbreak zone status
         return {
             "status": "success",
             "message": "Location updated",
-            "alert_sent": False,
-            "in_outbreak_zone": False
+            "alert_sent": alert_sent,
+            "in_outbreak_zone": in_outbreak_zone  # TRUE if currently in outbreak zone
         }
 
     except ValueError as e:

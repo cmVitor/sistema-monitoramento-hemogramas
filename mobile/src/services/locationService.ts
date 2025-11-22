@@ -42,11 +42,16 @@ export const locationService = {
 
     isMonitoring = true;
 
-    // Função para enviar localização
+    // Função para enviar localização e verificar surtos
     const sendLocation = async () => {
       try {
         const location = await locationService.getCurrentLocation();
         const deviceId = await getDeviceId();
+
+        console.log('📍 Enviando localização:', {
+          lat: location.coords.latitude.toFixed(6),
+          lng: location.coords.longitude.toFixed(6),
+        });
 
         const response = await apiService.sendLocationUpdate({
           device_id: deviceId,
@@ -55,21 +60,28 @@ export const locationService = {
           timestamp: new Date(location.timestamp).toISOString(),
         });
 
-        console.log('Localização enviada:', location.coords);
+        console.log('✅ Resposta da API:', {
+          status: response.status,
+          in_outbreak_zone: response.in_outbreak_zone,
+          alert_sent: response.alert_sent
+        });
 
-        // Notificar se entrou em zona de surto
-        if (onLocationUpdate && response.in_outbreak_zone) {
+        // Notificar IMEDIATAMENTE se está em zona de surto
+        if (response.in_outbreak_zone && onLocationUpdate) {
+          console.log('🚨 ALERTA: Você está em zona de surto!');
           onLocationUpdate(true);
         }
       } catch (error) {
-        console.error('Erro ao enviar localização:', error);
+        console.error('❌ Erro ao enviar localização:', error);
       }
     };
 
-    // Enviar localização imediatamente
+    // VERIFICAÇÃO IMEDIATA ao iniciar monitoramento
+    console.log('🚀 Iniciando monitoramento - Verificação imediata...');
     await sendLocation();
 
-    // Configurar polling
+    // Configurar polling rápido (5 segundos)
+    console.log(`⏱️  Polling configurado: verificar a cada ${LOCATION_UPDATE_INTERVAL / 1000}s`);
     locationPollingInterval = setInterval(sendLocation, LOCATION_UPDATE_INTERVAL);
   },
 
