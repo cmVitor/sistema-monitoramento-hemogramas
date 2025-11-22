@@ -10,14 +10,14 @@ from ..utils.fhir_utils import ELEVATED_LEUKOCYTES_THRESHOLD, build_fhir_communi
 
 def find_geographic_clusters(
     observations: List[HemogramObservation],
-    grid_size: float = 0.1
+    grid_size: float = 0.2
 ) -> Dict[Tuple[int, int], List[HemogramObservation]]:
     """
     Agrupa observações em clusters geográficos usando uma grade.
 
     Args:
         observations: Lista de observações com coordenadas
-        grid_size: Tamanho da célula da grade em graus (padrão: 0.1° ≈ 11km)
+        grid_size: Tamanho da célula da grade em graus (padrão: 0.2° ≈ 22km)
 
     Returns:
         Dicionário mapeando células da grade para listas de observações
@@ -101,20 +101,66 @@ def compute_cluster_stats(
     }
 
 
+def merge_adjacent_clusters(
+    clusters: Dict[Tuple[int, int], List[HemogramObservation]]
+) -> Dict[Tuple[int, int], List[HemogramObservation]]:
+    """
+    Mescla clusters adjacentes para evitar fragmentação artificial.
+
+    Clusters que estão a até 1 célula de distância são considerados adjacentes
+    e podem ser mesclados se juntos formarem um padrão mais forte.
+
+    Args:
+        clusters: Dicionário de clusters por célula da grade
+
+    Returns:
+        Dicionário de clusters mesclados
+    """
+    if not clusters:
+        return clusters
+
+    merged = {}
+    processed = set()
+
+    for grid_cell, observations in clusters.items():
+        if grid_cell in processed:
+            continue
+
+        # Inicia um novo cluster mesclado
+        merged_obs = list(observations)
+        processed.add(grid_cell)
+
+        # Busca células adjacentes (distância <= 1 em qualquer direção)
+        lat, lng = grid_cell
+        for adj_lat in range(lat - 1, lat + 2):
+            for adj_lng in range(lng - 1, lng + 2):
+                adj_cell = (adj_lat, adj_lng)
+                if adj_cell != grid_cell and adj_cell in clusters and adj_cell not in processed:
+                    # Mescla células adjacentes
+                    merged_obs.extend(clusters[adj_cell])
+                    processed.add(adj_cell)
+
+        if merged_obs:
+            merged[grid_cell] = merged_obs
+
+    return merged
+
+
 def evaluate_and_create_alert_if_needed(db: Session) -> AlertCommunication | None:
     """
-    Detecta surtos usando clustering geográfico.
+    Detecta surtos usando clustering geográfico com mesclagem de células adjacentes.
 
     Algoritmo:
     1. Busca todas as observações dos últimos 7 dias com coordenadas
-    2. Agrupa observações em clusters geográficos (grade de 0.1° ≈ 11km)
-    3. Para cada cluster com pelo menos 20 observações:
-       - Calcula % de casos elevados
-       - Calcula crescimento nas últimas 24h
-    4. Detecta surto se algum cluster atender aos critérios
+    2. Agrupa observações em clusters geográficos (grade de 0.2° ≈ 22km)
+    3. Mescla clusters adjacentes para evitar fragmentação
+    4. Para cada cluster mesclado com pelo menos 20 observações:
+       - Calcula % de casos elevados nos últimos 7 dias
+       - Calcula crescimento nas últimas 24h vs 24h anteriores
+    5. Detecta surto se algum cluster atender aos critérios
 
     Critérios de surto:
-    - Pelo menos 20 observações no cluster
+    - Pelo menos 20 observações no cluster (nos últimos 7 dias)
     - >40% dos casos com leucócitos elevados
     - >20% de aumento nas últimas 24h
 
@@ -139,18 +185,18 @@ def evaluate_and_create_alert_if_needed(db: Session) -> AlertCommunication | Non
     if not all_observations:
         return None
 
-    # Agrupa em clusters geográficos
-    clusters = find_geographic_clusters(all_observations, grid_size=0.1)
+    # Agrupa em clusters geográficos com grid maior
+    clusters = find_geographic_clusters(all_observations, grid_size=0.2)
 
-    # Avalia cada cluster
+    # Mescla clusters adjacentes para evitar fragmentação
+    clusters = merge_adjacent_clusters(clusters)
+
+    # Avalia cada cluster mesclado
     outbreak_detected = False
     best_cluster_stats = None
 
     for grid_cell, cluster_obs in clusters.items():
-        # Ignora clusters muito pequenos
-        if len(cluster_obs) < 20:
-            continue
-
+        # Calcula estatísticas para o cluster
         stats = compute_cluster_stats(
             cluster_obs,
             since_24h,
@@ -159,6 +205,10 @@ def evaluate_and_create_alert_if_needed(db: Session) -> AlertCommunication | Non
         )
 
         if stats is None:
+            continue
+
+        # Verifica volume mínimo (agora após filtrar para 7 dias)
+        if stats["total"] < 20:
             continue
 
         # Verifica critérios de surto
