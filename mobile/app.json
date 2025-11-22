@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Outbreak Alert",
+    "slug": "outbreak-alert",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.outbreak.alert"
+    },
+    "android": {
+      "package": "com.outbreak.alert",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir acesso à localização para alertar sobre surtos próximos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF6B6B"
+        }
+      ]
+    ]
+  }
+}

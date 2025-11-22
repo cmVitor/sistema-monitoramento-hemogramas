@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, Boolean
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -20,3 +20,17 @@ class AlertCommunication(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     summary = Column(String)
     fhir_communication = Column(JSON, nullable=False)
+
+class MobileDevice(Base):
+    __tablename__ = "mobile_devices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(String, unique=True, index=True, nullable=False)
+    fcm_token = Column(String, nullable=False)
+    platform = Column(String, nullable=False)  # 'ios' or 'android'
+    last_location_lat = Column(Float, nullable=True)
+    last_location_lng = Column(Float, nullable=True)
+    last_location_update = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True)
+    registered_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

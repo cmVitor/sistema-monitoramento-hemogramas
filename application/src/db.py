@@ -7,3 +7,11 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 
 class Base(DeclarativeBase):
     pass
+
+def get_db():
+    """Database session dependency for FastAPI."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

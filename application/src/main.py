@@ -19,6 +19,7 @@ from .views import (
     alerts_router,
     heatmap_router,
     data_generation_router,
+    mobile_router,
 )
 
 # Create tables with retry logic
@@ -64,6 +65,7 @@ app.include_router(observations_router)
 app.include_router(alerts_router)
 app.include_router(heatmap_router)
 app.include_router(data_generation_router)
+app.include_router(mobile_router)
 
 # Application startup/shutdown events
 @app.on_event("startup")
