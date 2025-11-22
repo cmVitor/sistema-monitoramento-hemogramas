@@ -41,7 +41,6 @@ def list_alerts(db: Session = Depends(get_db)):
     return [
         AlertOut(
             id=row.id,
-            region_ibge_code=row.region_ibge_code,
             summary=row.summary,
             fhir_communication=row.fhir_communication,
         )

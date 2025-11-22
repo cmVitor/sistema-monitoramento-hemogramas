@@ -43,33 +43,14 @@ def get_heatmap_data(db: Session = Depends(get_db)):
         .order_by(HemogramObservation.received_at.desc())
     ).scalars().all()
 
-    # Aggregate statistics by region (last 7 days)
+    # Check for recent alerts (outbreak status) in last 24h
     now = datetime.now(timezone.utc)
-    since_7d = now - timedelta(days=7)
     since_24h = now - timedelta(hours=24)
 
-    # Count cases per region in last 7 days
-    region_counts = {}
-    region_rows = db.execute(
-        select(
-            HemogramObservation.region_ibge_code,
-            func.count(HemogramObservation.id).label('count')
-        )
-        .where(HemogramObservation.received_at >= since_7d)
-        .group_by(HemogramObservation.region_ibge_code)
-    ).all()
-
-    for region_code, count in region_rows:
-        region_counts[region_code] = count
-
-    # Check for recent alerts (outbreak status) in last 24h
-    region_outbreaks = set()
-    alert_rows = db.execute(
-        select(AlertCommunication.region_ibge_code.distinct())
+    has_recent_alerts = db.execute(
+        select(func.count()).select_from(AlertCommunication)
         .where(AlertCommunication.created_at >= since_24h)
-    ).scalars().all()
-
-    region_outbreaks = set(alert_rows)
+    ).scalar() > 0
 
     # Compute outbreak geospatial data (centroid, radius, affected points)
     outbreak_data = compute_outbreak_regions(db)
@@ -80,10 +61,8 @@ def get_heatmap_data(db: Session = Depends(get_db)):
                 "lat": row.latitude,
                 "lng": row.longitude,
                 "intensity": row.leukocytes if row.leukocytes else 1.0,
-                "region": row.region_ibge_code,
                 "received_at": row.received_at.isoformat() if row.received_at else None,
-                "region_case_count": region_counts.get(row.region_ibge_code, 0),
-                "region_outbreak": row.region_ibge_code in region_outbreaks
+                "outbreak": has_recent_alerts
             }
             for row in rows
         ],
