@@ -61,9 +61,9 @@ async def seed_test_data(db: Session = Depends(get_db), count: int = 3000):
     result = await generate_synthetic_data(
         db=db,
         count=count,
-        goias_percentage=0.15,       # 15% from Goiás
-        goias_elevated_percentage=0.50,  # 50% elevated in Goiás (triggers alert)
-        other_elevated_percentage=0.15   # 15% elevated in other regions (normal)
+        goias_percentage=0.20,       # 20% from Goiás (concentrated outbreak area)
+        goias_elevated_percentage=0.60,  # 60% elevated in Goiás (strong outbreak signal)
+        other_elevated_percentage=0.15   # 15% elevated in other regions (normal baseline)
     )
 
     return result
