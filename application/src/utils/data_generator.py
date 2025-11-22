@@ -25,21 +25,21 @@ BRAZILIAN_REGIONS = {
 
 
 def generate_fhir_observation(
-    region_ibge_code: str,
     leukocytes: float,
     hours_ago: float = 0,
     include_coordinates: bool = True,
-    include_phone: bool = True
+    lat_range: tuple = (-16.75, -16.55),
+    lng_range: tuple = (-49.35, -49.15)
 ) -> Dict[str, Any]:
     """
     Generate a synthetic FHIR Observation for hemogram data.
 
     Args:
-        region_ibge_code: IBGE code for the region
         leukocytes: Leukocyte count value
         hours_ago: How many hours ago the observation was made (for time distribution)
         include_coordinates: Whether to include lat/lng
-        include_phone: Whether to include performer phone
+        lat_range: Latitude range for coordinate generation
+        lng_range: Longitude range for coordinate generation
 
     Returns:
         A FHIR Observation dict
@@ -50,25 +50,12 @@ def generate_fhir_observation(
     now = datetime.now(timezone.utc)
     effective_time = now - timedelta(hours=hours_ago)
 
-    # Get region info
-    region_info = BRAZILIAN_REGIONS.get(region_ibge_code, {
-        "name": "Unknown",
-        "state": "XX",
-        "lat_range": (-15.0, -14.0),
-        "lng_range": (-48.0, -47.0)
-    })
-
     # Generate coordinates
     lat = None
     lng = None
     if include_coordinates:
-        lat = random.uniform(*region_info["lat_range"])
-        lng = random.uniform(*region_info["lng_range"])
-
-    # Generate phone
-    phone = None
-    if include_phone:
-        phone = f"+55 62 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
+        lat = random.uniform(*lat_range)
+        lng = random.uniform(*lng_range)
 
     # Build FHIR Observation
     observation = {
@@ -97,11 +84,7 @@ def generate_fhir_observation(
             "text": "Leucócitos"
         },
         "subject": {
-            "reference": f"Patient/{uuid.uuid4()}",
-            "identifier": {
-                "system": "http://ibge.gov.br/regiao",
-                "value": region_ibge_code
-            }
+            "reference": f"Patient/{uuid.uuid4()}"
         },
         "effectiveDateTime": effective_time.isoformat(),
         "issued": effective_time.isoformat(),
@@ -111,12 +94,7 @@ def generate_fhir_observation(
             "system": "http://unitsofmeasure.org",
             "code": "/uL"
         },
-        "extension": [
-            {
-                "url": "http://ibge.gov.br/fhir/extension/region",
-                "valueString": region_ibge_code
-            }
-        ]
+        "extension": []
     }
 
     # Add geolocation if coordinates present
@@ -135,21 +113,6 @@ def generate_fhir_observation(
             ]
         })
 
-    # Add performer with phone if present
-    if phone:
-        observation["performer"] = [
-            {
-                "reference": f"Practitioner/{uuid.uuid4()}",
-                "display": f"Lab {region_info['name']}",
-                "telecom": [
-                    {
-                        "system": "phone",
-                        "value": phone
-                    }
-                ]
-            }
-        ]
-
     return observation
 
 
@@ -164,28 +127,25 @@ def generate_bulk_test_data(
 
     Args:
         total_count: Total number of observations to generate
-        goias_percentage: Percentage of observations from Goiás
-        goias_elevated_percentage: Percentage of Goiás observations with elevated leukocytes
+        goias_percentage: Percentage of observations from concentrated area
+        goias_elevated_percentage: Percentage of concentrated area observations with elevated leukocytes
         other_elevated_percentage: Percentage of other observations with elevated leukocytes
 
     Returns:
         List of FHIR Observation dicts
     """
     observations = []
-    goias_code = "5208707"  # Goiânia
-    other_regions = [code for code in BRAZILIAN_REGIONS.keys() if code != goias_code]
 
     # Calculate counts
-    goias_count = int(total_count * goias_percentage)
-    other_count = total_count - goias_count
+    concentrated_count = int(total_count * goias_percentage)
+    other_count = total_count - concentrated_count
 
-    # Generate Goiás observations
-    # Split into two time periods to create 24h increase
-    goias_prev_24h_count = int(goias_count * 0.35)  # 35% in previous 24h
-    goias_last_24h_count = goias_count - goias_prev_24h_count  # 65% in last 24h (increase!)
+    # Split concentrated area into two time periods to create 24h increase
+    concentrated_prev_24h_count = int(concentrated_count * 0.35)  # 35% in previous 24h
+    concentrated_last_24h_count = concentrated_count - concentrated_prev_24h_count  # 65% in last 24h (increase!)
 
-    # Previous 24h (25-48 hours ago)
-    for i in range(goias_prev_24h_count):
+    # Previous 24h (25-48 hours ago) - Concentrated area (Goiânia coordinates)
+    for i in range(concentrated_prev_24h_count):
         hours_ago = random.uniform(25, 48)
 
         # Determine if elevated
@@ -199,16 +159,16 @@ def generate_bulk_test_data(
             leukocytes = random.uniform(4000, 10000)
 
         obs = generate_fhir_observation(
-            region_ibge_code=goias_code,
             leukocytes=leukocytes,
             hours_ago=hours_ago,
             include_coordinates=True,
-            include_phone=True
+            lat_range=(-16.75, -16.55),
+            lng_range=(-49.35, -49.15)
         )
         observations.append(obs)
 
-    # Last 24h (0-24 hours ago)
-    for i in range(goias_last_24h_count):
+    # Last 24h (0-24 hours ago) - Concentrated area
+    for i in range(concentrated_last_24h_count):
         hours_ago = random.uniform(0, 24)
 
         # Determine if elevated (higher percentage for alert)
@@ -222,17 +182,18 @@ def generate_bulk_test_data(
             leukocytes = random.uniform(4000, 10000)
 
         obs = generate_fhir_observation(
-            region_ibge_code=goias_code,
             leukocytes=leukocytes,
             hours_ago=hours_ago,
             include_coordinates=True,
-            include_phone=True
+            lat_range=(-16.75, -16.55),
+            lng_range=(-49.35, -49.15)
         )
         observations.append(obs)
 
-    # Generate other regions observations
+    # Generate observations from other regions
     for i in range(other_count):
-        region_code = random.choice(other_regions)
+        # Select random region from BRAZILIAN_REGIONS
+        region_info = random.choice(list(BRAZILIAN_REGIONS.values()))
         hours_ago = random.uniform(0, 168)  # Up to 7 days
 
         # Determine if elevated
@@ -246,11 +207,11 @@ def generate_bulk_test_data(
             leukocytes = random.uniform(4000, 10000)
 
         obs = generate_fhir_observation(
-            region_ibge_code=region_code,
             leukocytes=leukocytes,
             hours_ago=hours_ago,
             include_coordinates=True,
-            include_phone=random.random() < 0.7  # 70% have phone
+            lat_range=region_info["lat_range"],
+            lng_range=region_info["lng_range"]
         )
         observations.append(obs)
 
