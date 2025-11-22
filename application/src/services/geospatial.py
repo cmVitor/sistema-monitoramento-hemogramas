@@ -66,13 +66,14 @@ def calculate_radius(points: List[Dict[str, float]], centroid: Dict[str, float])
 
 def compute_outbreak_regions(db: Session) -> Dict[str, Any]:
     """
-    Computes outbreak information based on recent alerts.
+    Computes outbreak information based on recent alerts using the same
+    clustering algorithm as outbreak detection.
 
     Returns outbreak data including:
     - centroid (lat, lng)
     - radius (in meters)
     - point count
-    - observations
+    - observations (only from the cluster with outbreak)
 
     Args:
         db: Database session
@@ -81,6 +82,11 @@ def compute_outbreak_regions(db: Session) -> Dict[str, Any]:
         Dict with outbreak data
     """
     from ..models import AlertCommunication
+    from .analysis import (
+        find_geographic_clusters,
+        merge_adjacent_clusters,
+        compute_cluster_stats
+    )
 
     now = datetime.now(timezone.utc)
     since_24h = now - timedelta(hours=24)
@@ -94,27 +100,60 @@ def compute_outbreak_regions(db: Session) -> Dict[str, Any]:
     if not recent_alerts:
         return {}
 
-    # Get all observations with coordinates (last 7 days)
+    # Use the same clustering logic as outbreak detection
     since_7d = now - timedelta(days=7)
-    observations = db.execute(
+    since_prev_24h = since_24h - timedelta(hours=24)
+
+    # Get all observations with coordinates (last 7 days)
+    all_observations = db.execute(
         select(HemogramObservation)
         .where(
+            HemogramObservation.received_at >= since_7d,
             HemogramObservation.latitude.isnot(None),
-            HemogramObservation.longitude.isnot(None),
-            HemogramObservation.received_at >= since_7d
+            HemogramObservation.longitude.isnot(None)
         )
     ).scalars().all()
 
-    if not observations:
+    if not all_observations:
         return {}
 
-    # Convert to point list
+    # Apply the same clustering algorithm
+    clusters = find_geographic_clusters(all_observations, grid_size=0.2)
+    clusters = merge_adjacent_clusters(clusters)
+
+    # Find the cluster with outbreak (same criteria as detection)
+    outbreak_cluster_obs = None
+    best_stats = None
+
+    for grid_cell, cluster_obs in clusters.items():
+        stats = compute_cluster_stats(
+            cluster_obs,
+            since_24h,
+            since_prev_24h,
+            since_7d
+        )
+
+        if stats is None or stats["total"] < 20:
+            continue
+
+        # Check outbreak criteria
+        if stats["pct_elevated"] > 40.0 and stats["increase_24h_pct"] > 20.0:
+            if (best_stats is None or
+                stats["pct_elevated"] > best_stats["pct_elevated"]):
+                best_stats = stats
+                outbreak_cluster_obs = stats["observations"]
+
+    # If no outbreak cluster found, return empty
+    if outbreak_cluster_obs is None:
+        return {}
+
+    # Convert to point list (only observations from outbreak cluster)
     points = [
         {"lat": obs.latitude, "lng": obs.longitude}
-        for obs in observations
+        for obs in outbreak_cluster_obs
     ]
 
-    # Calculate centroid and radius
+    # Calculate centroid and radius for the outbreak cluster
     centroid = calculate_centroid(points)
     radius = calculate_radius(points, centroid)
 
@@ -129,7 +168,7 @@ def compute_outbreak_regions(db: Session) -> Dict[str, Any]:
                 "leukocytes": obs.leukocytes,
                 "received_at": obs.received_at.isoformat() if obs.received_at else None
             }
-            for obs in observations
+            for obs in outbreak_cluster_obs
         ]
     }
 
