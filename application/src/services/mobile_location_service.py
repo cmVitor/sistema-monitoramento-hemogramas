@@ -57,7 +57,7 @@ class MobileLocationService:
         latitude: float,
         longitude: float,
         timestamp: Optional[datetime] = None
-    ) -> tuple[MobileDevice, bool]:
+    ) -> tuple[MobileDevice, bool, bool]:
         """
         Update device location and check if it entered an outbreak zone.
 
@@ -69,7 +69,10 @@ class MobileLocationService:
             timestamp: Location timestamp (defaults to now)
 
         Returns:
-            Tuple of (device, is_in_outbreak_zone)
+            Tuple of (device, should_alert, in_outbreak_zone)
+            - device: MobileDevice object
+            - should_alert: True if device JUST entered outbreak zone
+            - in_outbreak_zone: True if device IS currently in outbreak zone
         """
         if timestamp is None:
             timestamp = datetime.now(timezone.utc)
@@ -81,7 +84,7 @@ class MobileLocationService:
 
         if not device:
             logger.warning(f"Device {device_id} not registered, cannot update location")
-            return None, False
+            return None, False, False
 
         # Get outbreak data
         outbreak_data = compute_outbreak_regions(db)
@@ -106,13 +109,16 @@ class MobileLocationService:
         db.commit()
         db.refresh(device)
 
-        # Return True only if device just entered outbreak zone
+        # should_alert: True only if device JUST entered outbreak zone (transition)
         should_alert = in_outbreak and not was_in_outbreak
 
         if should_alert:
-            logger.info(f"Device {device_id} entered outbreak zone at ({latitude}, {longitude})")
+            logger.info(f"Device {device_id} ENTERED outbreak zone at ({latitude}, {longitude})")
+        elif in_outbreak:
+            logger.debug(f"Device {device_id} is STILL in outbreak zone at ({latitude}, {longitude})")
 
-        return device, should_alert
+        # Return both: should_alert AND current outbreak status
+        return device, should_alert, in_outbreak
 
     @staticmethod
     def get_devices_in_outbreak_zone(db: Session) -> list[MobileDevice]:

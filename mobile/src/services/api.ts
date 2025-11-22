@@ -34,12 +34,14 @@ export interface OutbreakRegion {
 export const apiService = {
   // Registrar dispositivo com token FCM
   registerDevice: async (data: RegisterDeviceRequest) => {
-    return api.post('/api/mobile/register', data);
+    const response = await api.post('/api/mobile/register', data);
+    return response.data;
   },
 
   // Enviar atualização de localização
   sendLocationUpdate: async (data: LocationUpdate) => {
-    return api.post('/api/mobile/location', data);
+    const response = await api.post('/api/mobile/location', data);
+    return response.data;
   },
 
   // Verificar regiões de surto (opcional - para exibir no mapa)

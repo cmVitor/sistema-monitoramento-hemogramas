@@ -55,20 +55,59 @@ export const notificationService = {
   },
 
   // Enviar notificação local quando entrar em zona de surto
-  sendLocalOutbreakAlert: async () => {
+  sendLocalOutbreakAlert: async (force: boolean = false) => {
     try {
+      console.log('📢 Enviando notificação local de alerta...');
+
+      // Enviar notificação IMEDIATAMENTE com máxima prioridade
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '⚠️ Alerta de Surto!',
-          body: 'Você está próximo a uma região com surto detectado. Tome cuidado!',
+          title: '🚨 ALERTA DE SURTO!',
+          body: 'ATENÇÃO! Você está em uma zona de surto ativo. Evite aglomerações e procure atendimento médico se necessário.',
           sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { type: 'outbreak_alert' },
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          vibrate: [0, 250, 250, 250], // Vibrar 3 vezes
+          data: {
+            type: 'outbreak_alert',
+            timestamp: Date.now(),
+            force: force
+          },
+          badge: 1,
         },
-        trigger: null, // Enviar imediatamente
+        trigger: null, // Enviar IMEDIATAMENTE
       });
+
+      console.log('✅ Notificação enviada com sucesso!');
     } catch (error) {
-      console.error('Erro ao enviar notificação local:', error);
+      console.error('❌ Erro ao enviar notificação local:', error);
+    }
+  },
+
+  // Enviar múltiplas notificações para garantir que o usuário veja
+  sendUrgentOutbreakAlert: async () => {
+    try {
+      console.log('🚨 Enviando alerta URGENTE de surto...');
+
+      // Primeira notificação - Imediata
+      await notificationService.sendLocalOutbreakAlert(true);
+
+      // Segunda notificação após 2 segundos (backup)
+      setTimeout(async () => {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '⚠️ Confirmação de Alerta',
+            body: 'Você continua em zona de surto. Mantenha-se alerta!',
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { type: 'outbreak_confirmation' },
+          },
+          trigger: { seconds: 0 },
+        });
+      }, 2000);
+
+      console.log('✅ Alertas urgentes enviados!');
+    } catch (error) {
+      console.error('❌ Erro ao enviar alertas urgentes:', error);
     }
   },
 
