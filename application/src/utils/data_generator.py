@@ -144,9 +144,9 @@ def generate_bulk_test_data(
     concentrated_prev_24h_count = int(concentrated_count * 0.35)  # 35% in previous 24h
     concentrated_last_24h_count = concentrated_count - concentrated_prev_24h_count  # 65% in last 24h (increase!)
 
-    # Previous 24h (25-48 hours ago) - Concentrated area (Goiânia coordinates)
+    # Previous 24h (24-48 hours ago) - Concentrated area (Goiânia coordinates)
     for i in range(concentrated_prev_24h_count):
-        hours_ago = random.uniform(25, 48)
+        hours_ago = random.uniform(24, 48)
 
         # Determine if elevated
         is_elevated = random.random() < goias_elevated_percentage
