@@ -8,38 +8,6 @@ LEUKOCYTE_CODES = {
 
 ELEVATED_LEUKOCYTES_THRESHOLD = 11000.0
 
-def extract_region_ibge_code(observation: Dict[str, Any]) -> Optional[str]:
-    for ext in observation.get("extension", []) or []:
-        url = ext.get("url")
-        if url and "ibge" in url.lower():
-            for k in ("valueString", "valueCode", "valueIdentifier"):
-                v = ext.get(k)
-                if isinstance(v, dict):
-                    val = v.get("value") or v.get("id") or v.get("system")
-                    if val:
-                        return str(val)
-                elif v:
-                    return str(v)
-
-    subject = observation.get("subject") or {}
-    identifier = subject.get("identifier")
-    if isinstance(identifier, list):
-        for ident in identifier:
-            system = (ident.get("system") or "").lower()
-            if "ibge" in system:
-                return str(ident.get("value") or "") or None
-    elif isinstance(identifier, dict):
-        system = (identifier.get("system") or "").lower()
-        if "ibge" in system:
-            return str(identifier.get("value") or "") or None
-
-    meta = observation.get("meta") or {}
-    for tag in (meta.get("tag") or []):
-        if "ibge" in (tag.get("system") or "").lower():
-            return str(tag.get("code") or "") or None
-
-    return None
-
 def extract_leukocytes(observation: Dict[str, Any]) -> Optional[float]:
     vq = observation.get("valueQuantity")
     if isinstance(vq, dict):
@@ -185,42 +153,7 @@ def extract_longitude(observation: Dict[str, Any]) -> Optional[float]:
 
     return None
 
-def extract_telefone(observation: Dict[str, Any]) -> Optional[str]:
-    """Extrai telefone de quem realizou o hemograma (performer)"""
-    # Procura em performer
-    performers = observation.get("performer", []) or []
-    for perf in performers:
-        if isinstance(perf, dict):
-            # Procura em telecom
-            telecoms = perf.get("telecom", []) or []
-            for telecom in telecoms:
-                if isinstance(telecom, dict):
-                    system = telecom.get("system", "").lower()
-                    if system in ("phone", "sms", "telefone"):
-                        value = telecom.get("value")
-                        if value:
-                            return str(value)
-
-            # Procura em extension
-            extensions = perf.get("extension", []) or []
-            for ext in extensions:
-                url = ext.get("url", "").lower()
-                if "phone" in url or "telefone" in url or "telecom" in url:
-                    value = ext.get("valueString") or ext.get("valueContactPoint", {}).get("value")
-                    if value:
-                        return str(value)
-
-    # Procura em extensions da observação
-    for ext in observation.get("extension", []) or []:
-        url = ext.get("url", "").lower()
-        if "performer-phone" in url or "telefone" in url:
-            value = ext.get("valueString") or ext.get("valueContactPoint", {}).get("value")
-            if value:
-                return str(value)
-
-    return None
-
-def build_fhir_communication_alert(region_ibge_code: str, stats: Dict[str, Any]) -> Dict[str, Any]:
+def build_fhir_communication_alert(stats: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "resourceType": "Communication",
         "status": "completed",
@@ -243,7 +176,7 @@ def build_fhir_communication_alert(region_ibge_code: str, stats: Dict[str, Any])
         "payload": [
             {
                 "contentString": (
-                    f"Regiao IBGE {region_ibge_code}: {stats.get('total', 0)} observacoes nas ultimas 7d; "
+                    f"{stats.get('total', 0)} observacoes nas ultimas 7d; "
                     f"{stats.get('pct_elevated', 0):.1f}% leucocitos elevados; "
                     f"variacao 24h: {stats.get('increase_24h_pct', 0):.1f}%"
                 )

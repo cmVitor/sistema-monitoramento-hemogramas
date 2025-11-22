@@ -12,14 +12,12 @@ from dateutil import parser as dateparser
 from ..models import HemogramObservation
 from ..utils.data_generator import generate_bulk_test_data
 from ..utils.fhir_utils import (
-    extract_region_ibge_code,
     extract_leukocytes,
     extract_latitude,
     extract_longitude,
-    extract_telefone,
     anonymize_observation
 )
-from .analysis import evaluate_and_create_alert_if_needed, compute_region_stats
+from .analysis import evaluate_and_create_alert_if_needed
 from .websocket_manager import manager as ws_manager
 
 
@@ -68,18 +66,14 @@ async def generate_synthetic_data(
 
     # Track statistics
     inserted_count = 0
-    region_counts: Dict[str, int] = {}
     alerts_created: List[Dict[str, Any]] = []
-    regions_checked_for_alerts = set()
 
     # Process each observation
     for i, obs_data in enumerate(observations):
         # Extract data from FHIR observation
-        region_ibge_code = extract_region_ibge_code(obs_data) or "unknown"
         leukocytes = extract_leukocytes(obs_data)
         latitude = extract_latitude(obs_data)
         longitude = extract_longitude(obs_data)
-        telefone = extract_telefone(obs_data)
 
         # Anonymize sensitive data
         sanitized = anonymize_observation(obs_data)
@@ -87,11 +81,9 @@ async def generate_synthetic_data(
         # Create database record
         record = HemogramObservation(
             fhir_id=obs_data.get("id") or None,
-            region_ibge_code=region_ibge_code,
             leukocytes=leukocytes,
             latitude=latitude,
             longitude=longitude,
-            telefone=telefone,
             raw=sanitized,
         )
 
@@ -106,19 +98,15 @@ async def generate_synthetic_data(
 
         # Update statistics
         inserted_count += 1
-        region_counts[region_ibge_code] = region_counts.get(region_ibge_code, 0) + 1
 
         # Send WebSocket notification
         await _send_observation_notification(record)
 
         # Check for alerts periodically
-        if (i + 1) % 50 == 0 or region_counts[region_ibge_code] >= 20:
-            alert = await _check_and_create_alert(
-                db, region_ibge_code, regions_checked_for_alerts
-            )
+        if (i + 1) % 50 == 0:
+            alert = await _check_and_create_alert(db)
             if alert:
                 alerts_created.append(alert)
-                regions_checked_for_alerts.add(region_ibge_code)
 
         # Delay for real-time visualization
         await asyncio.sleep(delay_seconds)
@@ -127,18 +115,11 @@ async def generate_synthetic_data(
         if (i + 1) % 100 == 0:
             print(f"   ⏳ Progresso: {i + 1}/{count} observações")
 
-    # Final alert check for all regions
+    # Final alert check
     print("   🔍 Verificação final de alertas...")
-    unique_regions = set(region_counts.keys())
-
-    for region_code in unique_regions:
-        if region_code not in regions_checked_for_alerts:
-            alert = await _check_and_create_alert(db, region_code, set())
-            if alert:
-                alerts_created.append(alert)
-
-    # Get detailed stats for Goiás
-    goias_stats = compute_region_stats(db, "5208707")
+    alert = await _check_and_create_alert(db)
+    if alert:
+        alerts_created.append(alert)
 
     # Send final refresh notification
     await ws_manager.send_data_refresh_event()
@@ -148,11 +129,8 @@ async def generate_synthetic_data(
     return {
         "status": "success",
         "inserted_count": inserted_count,
-        "regions_processed": len(unique_regions),
-        "region_distribution": region_counts,
         "alerts_created": len(alerts_created),
         "alerts": alerts_created,
-        "goias_stats": goias_stats,
         "message": (
             f"Successfully generated {inserted_count} hemogram observations in real-time. "
             f"Created {len(alerts_created)} alert(s)."
@@ -169,7 +147,6 @@ async def _send_observation_notification(record: HemogramObservation) -> None:
     """
     observation_data = {
         "id": record.id,
-        "region": record.region_ibge_code,
         "leukocytes": record.leukocytes,
         "latitude": record.latitude,
         "longitude": record.longitude,
@@ -179,38 +156,29 @@ async def _send_observation_notification(record: HemogramObservation) -> None:
 
 
 async def _check_and_create_alert(
-    db: Session,
-    region_ibge_code: str,
-    regions_checked: set
+    db: Session
 ) -> Dict[str, Any] | None:
     """
-    Check if an alert should be created for a region and send notification.
+    Check if an alert should be created and send notification.
 
     Args:
         db: Database session
-        region_ibge_code: Region IBGE code
-        regions_checked: Set of regions already checked
 
     Returns:
         Alert data if created, None otherwise
     """
-    if region_ibge_code in regions_checked:
-        return None
-
-    alert = evaluate_and_create_alert_if_needed(db, region_ibge_code)
+    alert = evaluate_and_create_alert_if_needed(db)
 
     if alert:
         # Send WebSocket notification
         alert_data = {
             "id": alert.id,
-            "region": alert.region_ibge_code,
             "summary": alert.summary,
             "created_at": alert.created_at.isoformat() if alert.created_at else None
         }
         await ws_manager.send_outbreak_alert_event(alert_data)
 
         return {
-            "region": region_ibge_code,
             "summary": alert.summary,
             "id": alert.id
         }
