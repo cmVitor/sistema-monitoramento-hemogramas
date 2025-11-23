@@ -7,10 +7,15 @@ and registers all API routers from views.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import socketio
 import os
 import time
 
 from .db import engine, Base
+
+# Import Socket.IO
+from .services.socketio_manager import sio, socketio_manager
+from .services.redis_service import redis_service
 
 # Import all routers from views
 from .views import (
@@ -46,6 +51,9 @@ app = FastAPI(
     description="Sistema de Monitoramento de Hemogramas - API para recepção, análise e alertas"
 )
 
+# Integrar Socket.IO com FastAPI
+socket_app = socketio.ASGIApp(sio, app, socketio_path='/socket.io')
+
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -70,18 +78,31 @@ app.include_router(mobile_router)
 # Application startup/shutdown events
 @app.on_event("startup")
 async def startup_event():
-    """Log application startup."""
-    print("=" * 60)
-    print("🚀 Hemogram Monitoring System Started")
-    print("=" * 60)
-    print(f"📍 API Docs: http://localhost:8000/docs")
-    print(f"🗺️  Heatmap: http://localhost:8000")
-    print("=" * 60)
+    """Initialize services on application startup."""
+    try:
+        # Inicializar Redis e Socket.IO Manager
+        await socketio_manager.initialize()
+
+        print("=" * 60)
+        print("🚀 Hemogram Monitoring System Started")
+        print("=" * 60)
+        print(f"📍 API Docs: http://localhost:8000/docs")
+        print(f"🗺️  Heatmap: http://localhost:8000")
+        print(f"🔌 Socket.IO: ws://localhost:8000/socket.io")
+        print(f"📡 Redis: Connected")
+        print("=" * 60)
+    except Exception as e:
+        print(f"❌ Error during startup: {e}")
+        raise
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Log application shutdown."""
-    print("=" * 60)
-    print("👋 Hemogram Monitoring System Shutting Down")
-    print("=" * 60)
+    """Cleanup on application shutdown."""
+    try:
+        await redis_service.disconnect()
+        print("=" * 60)
+        print("👋 Hemogram Monitoring System Shutting Down")
+        print("=" * 60)
+    except Exception as e:
+        print(f"❌ Error during shutdown: {e}")
