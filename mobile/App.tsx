@@ -1,50 +1,95 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
   Alert,
-  ScrollView,
-  ActivityIndicator,
   AppState,
 } from 'react-native';
 import { locationService } from './src/services/locationService';
 import { notificationService } from './src/services/notificationService';
+import { networkService } from './src/services/networkService';
+import MapView from './src/components/MapView';
 import * as Notifications from 'expo-notifications';
 
 export default function App() {
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const [inOutbreakZone, setInOutbreakZone] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Refs para controlar cooldown de alertas
+  const lastAlertTime = useRef<Date | null>(null);
+  const previousOutbreakState = useRef<boolean>(false);
+  const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos entre alertas
 
   useEffect(() => {
-    checkInitialState();
     setupNotificationListeners();
+    setupNetworkMonitoring();
 
-    // Parar monitoramento quando app vai para background
+    // Iniciar monitoramento automaticamente
+    initializeAutoMonitoring();
+
+    // Gerenciar estados do app (foreground/background)
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState === 'background' && isMonitoring) {
-        console.log('App em background - monitoramento pausado (limitação Expo Go)');
+      if (nextAppState === 'active') {
+        console.log('📱 App voltou para foreground - Retomando monitoramento...');
+        if (!isMonitoring && isOnline) {
+          startMonitoringInternal();
+        }
+      } else if (nextAppState === 'background') {
+        console.log('📱 App em background - Monitoramento continua (limitado pelo Expo Go)');
       }
     });
 
     return () => {
       subscription.remove();
       locationService.stopForegroundLocationPolling();
+      locationService.stopBackgroundLocationTracking();
     };
   }, []);
 
-  const checkInitialState = async () => {
-    const isActive = locationService.isLocationMonitoringActive();
-    setIsMonitoring(isActive);
+  // Effect para gerenciar monitoramento baseado na conectividade
+  useEffect(() => {
+    if (isOnline && !isMonitoring) {
+      console.log('📡 Online detectado - Iniciando monitoramento...');
+      startMonitoringInternal();
+    } else if (!isOnline && isMonitoring) {
+      console.log('📴 Offline detectado - Pausando monitoramento...');
+      locationService.stopForegroundLocationPolling();
+      locationService.stopBackgroundLocationTracking();
+      setIsMonitoring(false);
+    }
+  }, [isOnline]);
+
+  const initializeAutoMonitoring = async () => {
+    console.log('🚀 Inicializando monitoramento automático...');
+
+    // Verificar conectividade inicial
+    const connected = await networkService.isConnected();
+    setIsOnline(connected);
+
+    // Iniciar monitoramento se estiver online
+    if (connected) {
+      await startMonitoringInternal();
+    } else {
+      console.log('📴 Offline - Aguardando conexão para iniciar monitoramento...');
+    }
+  };
+
+  const setupNetworkMonitoring = () => {
+    // Monitorar mudanças na conectividade
+    const unsubscribe = networkService.subscribe((connected) => {
+      console.log('📡 Status de rede alterado:', connected ? 'Online' : 'Offline');
+      setIsOnline(connected);
+    });
+
+    return unsubscribe;
   };
 
   const setupNotificationListeners = () => {
@@ -63,214 +108,157 @@ export default function App() {
     });
   };
 
-  const handleRegisterDevice = async () => {
-    setLoading(true);
+  // Função para iniciar monitoramento automaticamente
+  const startMonitoringInternal = async () => {
     try {
-      const success = await notificationService.registerDevice();
-      if (success) {
-        setIsRegistered(true);
-        Alert.alert('Sucesso', 'Dispositivo registrado para monitoramento!');
-      } else {
-        Alert.alert('Aviso', 'Dispositivo registrado com limitações do Expo Go');
-        setIsRegistered(true); // Continuar mesmo assim
-      }
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao registrar dispositivo');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStartMonitoring = async () => {
-    setLoading(true);
-    try {
+      // Solicitar permissões de localização
       const hasPermissions = await locationService.requestPermissions();
       if (!hasPermissions) {
+        console.log('❌ Permissões de localização não concedidas');
         Alert.alert(
           'Permissões Necessárias',
-          'É necessário conceder permissão de localização para receber alertas de surto.'
+          'O aplicativo precisa de acesso à sua localização para alertá-lo sobre zonas de surto.',
+          [{ text: 'OK' }]
         );
-        setLoading(false);
         return;
       }
 
-      if (!isRegistered) {
-        await handleRegisterDevice();
+      // Registrar dispositivo para notificações (silenciosamente)
+      try {
+        await notificationService.registerDevice();
+        console.log('✅ Dispositivo registrado para notificações');
+      } catch (error) {
+        console.log('⚠️ Falha ao registrar dispositivo para notificações:', error);
       }
 
-      // Callback IMEDIATO para quando detectar zona de surto
-      const onOutbreakDetected = async (inZone: boolean) => {
-        console.log('🚨 Callback de surto acionado! inZone:', inZone);
-
-        if (inZone) {
-          // Atualizar estado IMEDIATAMENTE
-          setInOutbreakZone(true);
-          setAlertCount(prev => prev + 1);
-
-          // Enviar notificações URGENTES
-          await notificationService.sendUrgentOutbreakAlert();
-
-          // Mostrar alert IMEDIATO e proeminente
-          Alert.alert(
-            '🚨 ALERTA DE SURTO DETECTADO!',
-            'ATENÇÃO! Você está em uma zona de surto ativo!\n\n' +
-            '⚠️ Evite aglomerações\n' +
-            '🏥 Procure atendimento médico se tiver sintomas\n' +
-            '😷 Use máscara\n' +
-            '🧼 Lave as mãos frequentemente',
-            [
-              {
-                text: 'ENTENDI',
-                style: 'destructive'
-              }
-            ],
-            { cancelable: false }
-          );
-        } else {
-          setInOutbreakZone(false);
-        }
-      };
-
-      // Iniciar monitoramento com verificação IMEDIATA
-      console.log('🚀 Iniciando monitoramento...');
-      await locationService.startForegroundLocationPolling(onOutbreakDetected);
-
-      setIsMonitoring(true);
-      setLastUpdateTime(new Date());
-
-      Alert.alert(
-        'Monitoramento Ativo',
-        'Verificação a cada 5 segundos. Você será alertado IMEDIATAMENTE se entrar em zona de surto.\n\nMantenha o app aberto para detecção contínua.'
-      );
-    } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Não foi possível iniciar o monitoramento');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStopMonitoring = async () => {
-    setLoading(true);
-    try {
-      locationService.stopForegroundLocationPolling();
-      setIsMonitoring(false);
-      Alert.alert('Monitoramento Pausado', 'Você não receberá mais alertas de surto');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível parar o monitoramento');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGetCurrentLocation = async () => {
-    setLoading(true);
-    try {
+      // Obter localização atual
       const location = await locationService.getCurrentLocation();
       setCurrentLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       });
+
+      // Callback para atualizar localização e detectar zona de surto
+      const onLocationUpdate = async (inZone: boolean) => {
+        console.log('📍 Localização atualizada - Em zona de surto:', inZone);
+
+        // Atualizar localização atual
+        const location = await locationService.getCurrentLocation();
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        setLastUpdateTime(new Date());
+
+        // Atualizar estado visual
+        setInOutbreakZone(inZone);
+
+        // DETECTAR MUDANÇA DE ESTADO: apenas alertar quando ENTRA na zona (transição false -> true)
+        const stateChanged = inZone && !previousOutbreakState.current;
+
+        if (stateChanged) {
+          // Verificar cooldown para evitar flood de alertas
+          const now = new Date();
+          const timeSinceLastAlert = lastAlertTime.current
+            ? now.getTime() - lastAlertTime.current.getTime()
+            : Infinity;
+
+          const canAlert = timeSinceLastAlert > ALERT_COOLDOWN_MS;
+
+          if (canAlert) {
+            console.log('🚨 NOVA ENTRADA EM ZONA DE SURTO - Enviando alerta');
+
+            // Atualizar contador e timestamp
+            setAlertCount(prev => prev + 1);
+            lastAlertTime.current = now;
+
+            // Enviar notificação (apenas uma vez)
+            await notificationService.sendUrgentOutbreakAlert();
+
+            // Mostrar alerta visual (apenas uma vez)
+            Alert.alert(
+              '🚨 ALERTA DE SURTO',
+              'Você entrou em uma zona de surto ativo!\n\n' +
+              '⚠️ Evite aglomerações\n' +
+              '🏥 Procure atendimento se tiver sintomas\n' +
+              '😷 Use máscara\n' +
+              '🧼 Lave as mãos frequentemente',
+              [{ text: 'ENTENDI', style: 'destructive' }]
+            );
+          } else {
+            const minutesRemaining = Math.ceil((ALERT_COOLDOWN_MS - timeSinceLastAlert) / 60000);
+            console.log(`⏳ Cooldown ativo - próximo alerta em ${minutesRemaining} minutos`);
+          }
+        } else if (!inZone && previousOutbreakState.current) {
+          // Saiu da zona de surto
+          console.log('✅ Você saiu da zona de surto');
+        }
+
+        // Atualizar estado anterior
+        previousOutbreakState.current = inZone;
+      };
+
+      // Iniciar monitoramento em foreground
+      console.log('🚀 Monitoramento automático iniciado');
+      await locationService.startForegroundLocationPolling(onLocationUpdate);
+
+      // Tentar iniciar monitoramento em background (silenciosamente, pois não funciona no Expo Go)
+      try {
+        await locationService.startBackgroundLocationTracking(onLocationUpdate);
+        console.log('✅ Background tracking ativo (build standalone)');
+      } catch (error) {
+        // Silencioso: background não funciona no Expo Go, mas foreground funciona perfeitamente
+      }
+
+      setIsMonitoring(true);
       setLastUpdateTime(new Date());
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível obter localização');
-      console.error(error);
-    } finally {
-      setLoading(false);
+
+      console.log('✅ Monitoramento ativo - Você será alertado se entrar em zona de surto');
+    } catch (error: any) {
+      console.error('❌ Erro ao iniciar monitoramento:', error);
     }
   };
 
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Alerta de Surtos</Text>
-        <Text style={styles.subtitle}>Monitoramento em Tempo Real</Text>
+      {/* Banner de Status no Topo */}
+      <View style={styles.statusBar}>
+        <View style={[styles.statusIndicator, !isOnline && styles.statusIndicatorOffline]}>
+          <Text style={styles.statusText}>
+            {isOnline ? '● Online' : '○ Offline'}
+          </Text>
+        </View>
+        <View style={[styles.monitoringIndicator, isMonitoring && styles.monitoringIndicatorActive]}>
+          <Text style={styles.monitoringText}>
+            {isMonitoring ? '● Monitorando' : '○ Aguardando'}
+          </Text>
+        </View>
+        {lastUpdateTime && (
+          <Text style={styles.lastUpdateText}>
+            {lastUpdateTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        )}
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* ALERTA DE SURTO - Banner Vermelho */}
-        {inOutbreakZone && (
-          <View style={styles.outbreakBanner}>
-            <Text style={styles.outbreakIcon}>🚨</Text>
-            <Text style={styles.outbreakTitle}>VOCÊ ESTÁ EM ZONA DE SURTO!</Text>
-            <Text style={styles.outbreakText}>
-              Evite aglomerações e procure orientação médica se necessário
+      {/* Mapa em Tela Cheia */}
+      <MapView currentLocation={currentLocation} inOutbreakZone={inOutbreakZone} />
+
+      {/* Banner de Alerta de Surto (sobreposto ao mapa) */}
+      {inOutbreakZone && (
+        <View style={styles.outbreakAlert}>
+          <Text style={styles.outbreakAlertIcon}>🚨</Text>
+          <View style={styles.outbreakAlertContent}>
+            <Text style={styles.outbreakAlertTitle}>ZONA DE SURTO ATIVA</Text>
+            <Text style={styles.outbreakAlertText}>
+              Você está em uma região com surto detectado
             </Text>
-            <Text style={styles.outbreakCount}>
+            <Text style={styles.outbreakAlertCount}>
               Alertas recebidos: {alertCount}
             </Text>
           </View>
-        )}
-
-        {/* Banner de aviso Expo Go */}
-        {!inOutbreakZone && (
-          <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>
-              ℹ️ Verificação a cada 5 segundos • Alerta instantâneo
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.statusCard}>
-          <Text style={styles.statusLabel}>Status do Monitoramento</Text>
-          <View style={[styles.statusBadge, isMonitoring && styles.statusBadgeActive]}>
-            <Text style={[styles.statusText, isMonitoring && styles.statusTextActive]}>
-              {isMonitoring ? '✓ Ativo' : '○ Inativo'}
-            </Text>
-          </View>
-          {lastUpdateTime && isMonitoring && (
-            <Text style={styles.lastUpdateText}>
-              Última atualização: {lastUpdateTime.toLocaleTimeString('pt-BR')}
-            </Text>
-          )}
         </View>
-
-        {currentLocation && (
-          <View style={styles.locationCard}>
-            <Text style={styles.cardTitle}>Localização Atual</Text>
-            <Text style={styles.locationText}>Lat: {currentLocation.latitude.toFixed(6)}</Text>
-            <Text style={styles.locationText}>Lng: {currentLocation.longitude.toFixed(6)}</Text>
-          </View>
-        )}
-
-        <View style={styles.buttonsContainer}>
-          {!isMonitoring ? (
-            <TouchableOpacity
-              style={[styles.button, styles.buttonPrimary, loading && styles.buttonDisabled]}
-              onPress={handleStartMonitoring}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Iniciar Monitoramento</Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.button, styles.buttonDanger, loading && styles.buttonDisabled]}
-              onPress={handleStopMonitoring}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Parar Monitoramento</Text>
-              )}
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
-            onPress={handleGetCurrentLocation}
-            disabled={loading}
-          >
-            <Text style={styles.buttonTextSecondary}>Ver Minha Localização</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      )}
     </View>
   );
 }
@@ -278,192 +266,103 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#000',
   },
-  header: {
-    backgroundColor: '#FF6B6B',
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  outbreakBanner: {
-    backgroundColor: '#FF0000',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 15,
+  statusBar: {
+    position: 'absolute',
+    top: 50,
+    left: 10,
+    right: 10,
+    zIndex: 1000,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#8B0000',
-    shadowColor: '#FF0000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  outbreakIcon: {
-    fontSize: 48,
-    marginBottom: 10,
-  },
-  outbreakTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  outbreakText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  outbreakCount: {
-    fontSize: 12,
-    color: '#FFE0E0',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  warningBanner: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
     padding: 12,
-    marginBottom: 15,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#856404',
-    textAlign: 'center',
-  },
-  statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  statusLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-  },
-  statusBadge: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  statusBadgeActive: {
+  statusIndicator: {
     backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
   },
-  statusText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  statusTextActive: {
-    color: '#fff',
-  },
-  lastUpdateText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 10,
-    fontStyle: 'italic',
-  },
-  locationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'monospace',
-    marginVertical: 2,
-  },
-  infoCard: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1976D2',
-    marginBottom: 10,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 22,
-  },
-  buttonsContainer: {
-    gap: 12,
-  },
-  button: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPrimary: {
-    backgroundColor: '#4CAF50',
-  },
-  buttonDanger: {
+  statusIndicatorOffline: {
     backgroundColor: '#f44336',
   },
-  buttonSecondary: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
+  statusText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
   },
-  buttonTextSecondary: {
-    color: '#FF6B6B',
-    fontSize: 16,
+  monitoringIndicator: {
+    backgroundColor: '#9E9E9E',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  monitoringIndicatorActive: {
+    backgroundColor: '#2196F3',
+  },
+  monitoringText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
+  },
+  lastUpdateText: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+  },
+  outbreakAlert: {
+    position: 'absolute',
+    bottom: 100,
+    left: 10,
+    right: 10,
+    zIndex: 1000,
+    backgroundColor: 'rgba(220, 38, 38, 0.98)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 3,
+    borderColor: '#fbbf24',
+    shadowColor: '#FF0000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  outbreakAlertIcon: {
+    fontSize: 40,
+    marginRight: 15,
+  },
+  outbreakAlertContent: {
+    flex: 1,
+  },
+  outbreakAlertTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 6,
+  },
+  outbreakAlertText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  outbreakAlertCount: {
+    fontSize: 11,
+    color: '#fbbf24',
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

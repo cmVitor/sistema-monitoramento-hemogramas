@@ -11,13 +11,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.outbreak.alert"
+      "bundleIdentifier": "com.outbreak.alert",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
     },
     "android": {
       "package": "com.outbreak.alert",
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "plugins": [

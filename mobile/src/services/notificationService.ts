@@ -13,6 +13,10 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Controle de cooldown para notificações
+let lastNotificationTime: Date | null = null;
+const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos entre notificações
+
 export const notificationService = {
   // Solicitar permissões de notificação
   requestPermissions: async (): Promise<boolean> => {
@@ -83,31 +87,45 @@ export const notificationService = {
     }
   },
 
-  // Enviar múltiplas notificações para garantir que o usuário veja
+  // Enviar notificação de alerta de surto (com cooldown)
   sendUrgentOutbreakAlert: async () => {
     try {
-      console.log('🚨 Enviando alerta URGENTE de surto...');
+      // Verificar cooldown
+      const now = new Date();
+      if (lastNotificationTime) {
+        const timeSinceLastNotification = now.getTime() - lastNotificationTime.getTime();
+        if (timeSinceLastNotification < NOTIFICATION_COOLDOWN_MS) {
+          const minutesRemaining = Math.ceil((NOTIFICATION_COOLDOWN_MS - timeSinceLastNotification) / 60000);
+          console.log(`⏳ Cooldown de notificação ativo - próxima notificação em ${minutesRemaining} minutos`);
+          return;
+        }
+      }
 
-      // Primeira notificação - Imediata
-      await notificationService.sendLocalOutbreakAlert(true);
+      console.log('🚨 Enviando alerta de surto...');
 
-      // Segunda notificação após 2 segundos (backup)
-      setTimeout(async () => {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '⚠️ Confirmação de Alerta',
-            body: 'Você continua em zona de surto. Mantenha-se alerta!',
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: { type: 'outbreak_confirmation' },
+      // Enviar notificação única
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🚨 ALERTA DE SURTO',
+          body: 'Você está em uma zona de surto ativo. Evite aglomerações e procure atendimento se necessário.',
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          vibrate: [0, 250, 250, 250],
+          data: {
+            type: 'outbreak_alert',
+            timestamp: now.getTime(),
           },
-          trigger: { seconds: 0 },
-        });
-      }, 2000);
+          badge: 1,
+        },
+        trigger: null, // Enviar imediatamente
+      });
 
-      console.log('✅ Alertas urgentes enviados!');
+      // Atualizar timestamp da última notificação
+      lastNotificationTime = now;
+
+      console.log('✅ Notificação de alerta enviada!');
     } catch (error) {
-      console.error('❌ Erro ao enviar alertas urgentes:', error);
+      console.error('❌ Erro ao enviar notificação:', error);
     }
   },
 

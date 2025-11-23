@@ -194,5 +194,56 @@ async def get_device_count(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to get device count")
 
 
+@router.get("/check-outbreak-zone")
+async def check_outbreak_zone(
+    latitude: float,
+    longitude: float,
+    db: Session = Depends(get_db)
+):
+    """
+    Lightweight endpoint to check if a location is in an outbreak zone.
+    Does NOT update device location in database.
+
+    Query parameters:
+    - **latitude**: Current latitude
+    - **longitude**: Current longitude
+
+    Returns:
+    - **in_outbreak_zone**: True if location is in outbreak zone
+    - **outbreak_info**: Details about the outbreak (if in zone)
+    """
+    try:
+        from ..services.geospatial import compute_outbreak_regions
+
+        # Get outbreak data (cached)
+        outbreak_data = compute_outbreak_regions(db)
+
+        # Check if location is in outbreak zone
+        in_outbreak = mobile_location_service.is_in_outbreak_zone(
+            latitude=latitude,
+            longitude=longitude,
+            outbreak_data=outbreak_data
+        )
+
+        response = {
+            "in_outbreak_zone": in_outbreak
+        }
+
+        # Add outbreak info if in zone
+        if in_outbreak and outbreak_data and "outbreak" in outbreak_data:
+            outbreak = outbreak_data["outbreak"]
+            response["outbreak_info"] = {
+                "centroid": outbreak["centroid"],
+                "radius": outbreak["radius"],
+                "point_count": outbreak["point_count"]
+            }
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error checking outbreak zone: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check outbreak zone")
+
+
 # Export router
 mobile_router = router
