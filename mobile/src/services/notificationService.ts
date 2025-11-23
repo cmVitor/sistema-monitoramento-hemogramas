@@ -31,9 +31,36 @@ export const notificationService = {
     return finalStatus === 'granted';
   },
 
-  // Registrar dispositivo no backend (versão simplificada para Expo Go)
-  // NOTA: Push notifications remotas não funcionam no Expo Go SDK 53+
-  // Este método registra o dispositivo apenas para tracking
+  // Obter Expo Push Token (funciona apenas em standalone builds)
+  getExpoPushToken: async (): Promise<string | null> => {
+    try {
+      // Só funciona em dispositivos físicos ou standalone builds
+      if (!Device.isDevice) {
+        console.warn('⚠️ Expo Push Tokens não funcionam em simulador/emulador');
+        return null;
+      }
+
+      const hasPermission = await notificationService.requestPermissions();
+      if (!hasPermission) {
+        console.warn('⚠️ Permissão de notificação negada');
+        return null;
+      }
+
+      // Obter token Expo Push
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'your-project-id' // Opcional: adicionar seu project ID
+      });
+
+      console.log('✅ Expo Push Token obtido:', tokenData.data);
+      return tokenData.data;
+
+    } catch (error) {
+      console.warn('⚠️ Erro ao obter Expo Push Token (normal no Expo Go):', error);
+      return null;
+    }
+  },
+
+  // Registrar dispositivo no backend com Expo Push Token
   registerDevice: async (): Promise<boolean> => {
     try {
       const hasPermission = await notificationService.requestPermissions();
@@ -43,17 +70,28 @@ export const notificationService = {
 
       const deviceId = await getDeviceId();
 
-      // Registrar sem token push (será usado apenas para location tracking)
+      // Tentar obter Expo Push Token (funciona apenas em standalone)
+      let pushToken = await notificationService.getExpoPushToken();
+
+      if (!pushToken) {
+        // Fallback para Expo Go mode
+        pushToken = `expo-go-${deviceId}`;
+        console.log('📱 Modo Expo Go - usando token local');
+      } else {
+        console.log('📱 Standalone build - usando Expo Push Token');
+      }
+
+      // Registrar dispositivo no backend
       await apiService.registerDevice({
-        fcm_token: `expo-go-${deviceId}`, // Token fictício para Expo Go
+        fcm_token: pushToken,
         device_id: deviceId,
         platform: Platform.OS as 'ios' | 'android',
       });
 
-      console.log('Dispositivo registrado para tracking (Expo Go mode)');
+      console.log('✅ Dispositivo registrado com sucesso');
       return true;
     } catch (error) {
-      console.error('Erro ao registrar dispositivo:', error);
+      console.error('❌ Erro ao registrar dispositivo:', error);
       return false;
     }
   },
