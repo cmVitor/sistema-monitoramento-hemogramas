@@ -4,13 +4,16 @@ Mobile location service for checking if devices are in outbreak regions.
 from typing import Optional, Dict, Any
 from math import sqrt
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 
 from ..models import MobileDevice
 from .geospatial import compute_outbreak_regions
 
 logger = logging.getLogger(__name__)
+
+# Cooldown period between alerts for the same device (in minutes)
+ALERT_COOLDOWN_MINUTES = 5
 
 
 class MobileLocationService:
@@ -110,10 +113,33 @@ class MobileLocationService:
         db.refresh(device)
 
         # should_alert: True only if device JUST entered outbreak zone (transition)
-        should_alert = in_outbreak and not was_in_outbreak
+        entered_outbreak_zone = in_outbreak and not was_in_outbreak
 
-        if should_alert:
-            logger.info(f"Device {device_id} ENTERED outbreak zone at ({latitude}, {longitude})")
+        # Check cooldown: don't alert if last alert was sent recently
+        should_alert = False
+        if entered_outbreak_zone:
+            if device.last_alert_sent:
+                # Check if enough time has passed since last alert
+                time_since_last_alert = timestamp - device.last_alert_sent
+                if time_since_last_alert < timedelta(minutes=ALERT_COOLDOWN_MINUTES):
+                    minutes_remaining = ALERT_COOLDOWN_MINUTES - (time_since_last_alert.total_seconds() / 60)
+                    logger.info(
+                        f"Device {device_id} entered outbreak zone but alert is in cooldown "
+                        f"({minutes_remaining:.1f} minutes remaining)"
+                    )
+                    should_alert = False
+                else:
+                    should_alert = True
+            else:
+                # First time entering outbreak zone
+                should_alert = True
+
+            if should_alert:
+                # Update last_alert_sent timestamp
+                device.last_alert_sent = timestamp
+                db.commit()
+                db.refresh(device)
+                logger.info(f"Device {device_id} ENTERED outbreak zone at ({latitude}, {longitude}) - ALERT SENT")
         elif in_outbreak:
             logger.debug(f"Device {device_id} is STILL in outbreak zone at ({latitude}, {longitude})")
 

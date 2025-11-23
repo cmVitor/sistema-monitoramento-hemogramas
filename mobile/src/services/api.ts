@@ -46,8 +46,35 @@ export const apiService = {
 
   // Verificar regiões de surto (opcional - para exibir no mapa)
   getOutbreakRegions: async (): Promise<OutbreakRegion | null> => {
-    const response = await api.get('/api/heatmap/outbreak-data');
-    return response.data.outbreak || null;
+    const response = await api.get('/heatmap-data');
+    const data = response.data;
+
+    // O backend retorna { observations: [...], outbreaks: {...} }
+    if (data.outbreaks && data.outbreaks.centroid) {
+      return {
+        centroid: {
+          lat: data.outbreaks.centroid[0],
+          lng: data.outbreaks.centroid[1],
+        },
+        radius: data.outbreaks.radius,
+        point_count: data.outbreaks.point_count,
+      };
+    }
+
+    return null;
+  },
+
+  // Verificar se localização está em zona de surto (endpoint leve, não atualiza BD)
+  checkOutbreakZone: async (latitude: number, longitude: number): Promise<boolean> => {
+    try {
+      const response = await api.get('/api/mobile/check-outbreak-zone', {
+        params: { latitude, longitude }
+      });
+      return response.data.in_outbreak_zone;
+    } catch (error) {
+      console.error('Erro ao verificar zona de surto:', error);
+      return false;
+    }
   },
 };
 

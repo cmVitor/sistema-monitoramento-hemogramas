@@ -31,6 +31,7 @@ class MobileDevice(Base):
     last_location_lat = Column(Float, nullable=True)
     last_location_lng = Column(Float, nullable=True)
     last_location_update = Column(DateTime(timezone=True), nullable=True)
+    last_alert_sent = Column(DateTime(timezone=True), nullable=True)  # Timestamp of last outbreak alert
     is_active = Column(Boolean, default=True)
     registered_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
