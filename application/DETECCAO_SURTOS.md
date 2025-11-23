@@ -1,367 +1,227 @@
-# Detecção e Delimitação de Surtos
+# Detecção e Delimitação de Surtos Epidemiológicos
 
-Este documento descreve como o sistema identifica surtos epidemiológicos usando clustering geográfico e delimita suas áreas.
-
----
-
-## 1. Detecção de Surtos por Clustering Geográfico
-
-### 1.1 Visão Geral do Algoritmo
-
-O sistema detecta surtos automaticamente usando **clustering geográfico** ao invés de divisões administrativas. Isso permite identificar focos de doenças independentemente de fronteiras políticas.
-
-**Algoritmo:**
-1. Busca todas as observações dos últimos 7 dias com coordenadas geográficas
-2. Agrupa observações em clusters usando uma grade geográfica (0.1° ≈ 11km)
-3. Para cada cluster com pelo menos 20 observações, calcula estatísticas
-4. Detecta surto se algum cluster atender aos critérios
-
-### 1.2 Critérios de Detecção por Cluster
-
-Um **surto é detectado** quando um cluster geográfico atende **TODOS** os critérios:
-
-1. **Critério de Volume**: Pelo menos 20 observações no cluster
-2. **Critério de Severidade**: >40% dos casos com leucócitos elevados (nos últimos 7 dias)
-3. **Critério de Crescimento**: >20% de aumento no número de casos (últimas 24h vs 24h anteriores)
-
-### 1.3 Threshold de Leucócitos Elevados
-
-```
-Leucócitos >= 11.000/µL = Elevado
-```
-
-**Fonte**: `application/src/utils/fhir_utils.py:9`
+Este documento descreve em detalhes como o sistema Ubiquo identifica surtos epidemiológicos e delimita suas regiões geográficas afetadas.
 
 ---
 
-## 2. Clustering Geográfico
+## 1. Visão Geral do Processo
 
-### 2.1 Grade de Agrupamento
-
-O sistema divide o mapa em células de uma grade geográfica:
-
-```python
-grid_size = 0.1°  # Aproximadamente 11km x 11km
-grid_lat = int(latitude / 0.1)
-grid_lng = int(longitude / 0.1)
-grid_cell = (grid_lat, grid_lng)
-```
-
-**Exemplo:**
-```
-Observação em (-16.680, -49.254):
-- grid_lat = int(-16.680 / 0.1) = -166
-- grid_lng = int(-49.254 / 0.1) = -492
-- Célula: (-166, -492)
-
-Observação em (-16.685, -49.258):
-- Célula: (-166, -492)  ← Mesmo cluster!
-
-Observação em (-15.680, -49.254):
-- Célula: (-156, -492)  ← Cluster diferente
-```
-
-### 2.2 Tamanho da Grade
-
-| Valor | Tamanho Aproximado | Uso |
-|-------|-------------------|-----|
-| 0.05° | ~5.5km | Clusters pequenos (áreas urbanas densas) |
-| **0.1°** | **~11km** | **Padrão - balanceado** |
-| 0.2° | ~22km | Clusters grandes (áreas rurais) |
-
-**Arquivo**: `application/src/services/analysis.py:11-40`
+O sistema utiliza análise geoespacial avançada para detectar surtos de forma automática e contínua. A detecção ocorre independentemente de divisões administrativas, focando em padrões epidemiológicos reais observados através de hemogramas coletados. O processo é dividido em três etapas principais: agrupamento geográfico, análise temporal e delimitação espacial.
 
 ---
 
-## 3. Janelas Temporais
+## 2. Coleta e Preparação dos Dados
 
-O sistema utiliza três janelas temporais para análise:
+### 2.1 Janela Temporal de Análise
 
-| Janela | Período | Uso |
-|--------|---------|-----|
-| **7 dias** | Últimos 7 dias | Cálculo de estatísticas gerais e percentual de casos elevados |
-| **Últimas 24h** | Últimas 24 horas | Contagem de casos recentes |
-| **24h anteriores** | De 48h até 24h atrás | Contagem de casos do período anterior (para calcular aumento) |
+O sistema trabalha com três janelas temporais distintas para análise epidemiológica. A primeira é a janela de 7 dias, que captura o comportamento geral do surto e serve como base para cálculos estatísticos abrangentes. A segunda é a janela de últimas 24 horas, que monitora a atividade mais recente e permite identificar acelerações no padrão de casos. A terceira é a janela de 24 horas anteriores, que compreende o período entre 48 e 24 horas atrás, utilizada como referência para calcular crescimento relativo.
 
----
+### 2.2 Filtros de Qualidade
 
-## 4. Cálculo de Estatísticas por Cluster
-
-Para cada cluster geográfico, o sistema calcula:
-
-### 4.1 Total de Casos no Cluster (7 dias)
-```python
-# Filtra observações do cluster nos últimos 7 dias
-obs_7d = [obs for obs in cluster if obs.received_at >= since_7d]
-total = len(obs_7d)
-```
-
-### 4.2 Casos com Leucócitos Elevados (7 dias)
-```python
-elevated = sum(
-    1 for obs in obs_7d
-    if obs.leukocytes is not None and obs.leukocytes >= 11000
-)
-```
-
-### 4.3 Percentual de Casos Elevados
-```
-% Elevados = (Casos Elevados / Total de Casos) × 100
-```
-
-### 4.4 Casos nas Últimas 24h
-```python
-last_24 = sum(1 for obs in obs_7d if obs.received_at >= since_24h)
-```
-
-### 4.5 Casos nas 24h Anteriores
-```python
-prev_24 = sum(
-    1 for obs in obs_7d
-    if since_prev_24h <= obs.received_at < since_24h
-)
-```
-
-### 4.6 Percentual de Aumento
-```
-% Aumento = ((Últimas 24h - 24h Anteriores) / 24h Anteriores) × 100
-```
-
-**Caso especial**: Se não houver casos nas 24h anteriores, mas houver nas últimas 24h, considera-se 100% de aumento.
-
-**Arquivo**: `application/src/services/analysis.py:43-101`
+Apenas observações que contêm coordenadas geográficas válidas são consideradas na análise. O sistema requer latitude e longitude precisas para cada hemograma, descartando automaticamente registros sem geolocalização. Essa filtragem garante que todos os cálculos espaciais sejam baseados em dados confiáveis e geograficamente verificáveis.
 
 ---
 
-## 5. Lógica de Decisão
+## 3. Agrupamento Geográfico por Grade
 
-```python
-def é_surto_no_cluster(cluster, estatísticas):
-    return (
-        len(cluster) >= 20  # Volume mínimo
-        AND
-        estatísticas['pct_elevated'] > 40.0  # Severidade
-        AND
-        estatísticas['increase_24h_pct'] > 20.0  # Crescimento
-    )
-```
+### 3.1 Divisão em Células Geográficas
 
-**Arquivo**: `application/src/services/analysis.py:104-199`
+O sistema divide o território em células de uma grade geográfica uniforme. Cada célula tem tamanho de 0,2 graus, o que corresponde aproximadamente a 22 quilômetros. Esta divisão permite agrupar casos que ocorrem em proximidade geográfica sem depender de fronteiras municipais ou estaduais.
 
-### Exemplo de Surto Detectado
+Cada observação é mapeada para uma célula específica através de suas coordenadas. Por exemplo, uma observação localizada em latitude -16,680 e longitude -49,254 é dividida por 0,2, resultando em índices inteiros que identificam sua célula na grade. Observações próximas compartilham a mesma célula, formando agrupamentos naturais.
 
-```
-Cluster Geográfico (-166, -492) [Goiânia, GO]
-├─ Observações totais: 450
-├─ Volume: 450 casos        ✓ (>= 20)
-├─ Casos elevados: 225
-├─ % Elevados: 50.0%        ✓ (> 40%)
-├─ Últimas 24h: 120
-├─ 24h anteriores: 80
-└─ % Aumento: 50.0%         ✓ (> 20%)
+### 3.2 Mesclagem de Células Adjacentes
 
-Centroide: (-16.6830, -49.2540)
+Após a divisão inicial, o sistema identifica células vizinhas que devem ser consideradas parte do mesmo surto. Células são consideradas adjacentes quando estão a até uma posição de distância em qualquer direção, incluindo diagonais. Isso significa que uma célula pode ter até 8 vizinhas imediatas.
 
-RESULTADO: SURTO DETECTADO ⚠️
-```
+A mesclagem previne fragmentação artificial dos surtos. Um surto real pode se estender por múltiplas células adjacentes, e tratá-las separadamente geraria falsos negativos ou subestimaria a severidade do evento. Ao mesclar células próximas, o sistema reconstrói a extensão verdadeira do surto.
 
-### Múltiplos Clusters
+### 3.3 Exemplo Prático de Agrupamento
 
-Se múltiplos clusters atendem aos critérios, o sistema seleciona o cluster com **maior percentual de casos elevados**.
+Considere três localizações de hemogramas: Hospital A em (-16,680, -49,254), Clínica B em (-16,685, -49,258) e Posto C em (-15,680, -49,254). O Hospital A e a Clínica B, apesar de estarem em endereços diferentes, caem na mesma célula da grade pois suas coordenadas divididas por 0,2 geram os mesmos índices. Já o Posto C cai em célula diferente, pois sua latitude está aproximadamente 1 grau distante.
+
+Se o Hospital A e a Clínica B acumularem casos suficientes em sua célula, e o Posto C estiver em célula adjacente também com casos, o sistema pode mesclar ambas as células em um único cluster maior para análise conjunta.
 
 ---
 
-## 6. Delimitação Geográfica da Área de Surto
+## 4. Classificação de Surtos - Critérios de Detecção
 
-Quando um surto é detectado, o sistema calcula automaticamente a área geográfica afetada.
+### 4.1 Os Três Critérios Fundamentais
 
-### 6.1 Coleta de Observações do Cluster
+Um surto é detectado quando um cluster geográfico satisfaz simultaneamente três critérios rigorosos. Esses critérios foram estabelecidos para balancear sensibilidade e especificidade, evitando tanto falsos positivos quanto falsos negativos na detecção epidemiológica.
 
-O sistema usa **todas as observações do cluster com surto detectado** nos **últimos 7 dias**.
+### 4.2 Critério 1 - Volume Mínimo de Casos
 
----
+O primeiro critério exige que o cluster contenha pelo menos 20 observações nos últimos 7 dias. Este threshold elimina flutuações aleatórias e garante significância estatística. Clusters menores podem representar variações normais na demanda de exames ou casos isolados sem relevância epidemiológica.
 
-### 6.2 Cálculo do Centroide
+O volume é calculado após filtrar para os últimos 7 dias, garantindo que apenas casos recentes sejam contabilizados. Observações mais antigas não contribuem para este critério, mantendo o foco em eventos atuais.
 
-O **centroide** (centro geográfico) é calculado pela **média aritmética** de todas as coordenadas:
+### 4.3 Critério 2 - Severidade por Leucócitos Elevados
 
-```python
-centroide_latitude = Σ(latitudes) / n
-centroide_longitude = Σ(longitudes) / n
-```
+O segundo critério analisa a severidade clínica dos casos. O sistema conta quantos hemogramas apresentam contagem de leucócitos igual ou superior a 11.000 células por microlitro, threshold clínico que indica resposta imune elevada. Um surto verdadeiro deve apresentar mais de 40% dos casos com leucócitos elevados nos últimos 7 dias.
 
-Onde `n` = número total de observações com coordenadas.
+Este critério diferencia surtos infecciosos reais de simples aumento no volume de exames. Se um cluster tem muitos hemogramas mas poucos casos elevados, não há evidência de processo infeccioso coletivo. O percentual de 40% foi calibrado para capturar surtos significativos sem disparar alertas para variações sazonais menores.
 
-**Arquivo**: `application/src/services/geospatial.py:14-33`
+### 4.4 Critério 3 - Crescimento Temporal Acelerado
 
-#### Exemplo
+O terceiro critério verifica se há aceleração no padrão de casos. O sistema compara o número de casos nas últimas 24 horas com o número de casos nas 24 horas imediatamente anteriores. Um surto ativo deve mostrar crescimento superior a 20% nesta comparação.
 
-```
-Observações:
-- Ponto 1: (-16.680, -49.254)
-- Ponto 2: (-16.682, -49.256)
-- Ponto 3: (-16.678, -49.252)
+Este critério temporal identifica surtos em expansão ativa. Situações endêmicas estáveis, mesmo com muitos casos, não disparam alertas pois não apresentam crescimento significativo. O sistema busca detectar eventos em evolução que requerem intervenção urgente.
 
-Centroide:
-- Latitude: (-16.680 + -16.682 + -16.678) / 3 = -16.680
-- Longitude: (-49.254 + -49.256 + -49.252) / 3 = -49.254
-```
+Há um caso especial: quando existem casos nas últimas 24 horas mas nenhum caso nas 24 horas anteriores, o sistema considera crescimento de 100%, sinalizando início súbito de atividade epidemiológica.
 
----
+### 4.5 Exemplo de Classificação Positiva
 
-### 6.3 Cálculo do Raio
+Imagine um cluster na região metropolitana de Goiânia. Nos últimos 7 dias, foram registradas 450 observações nesta área. Destas, 225 apresentam leucócitos elevados, representando 50% do total. Nas últimas 24 horas foram registrados 120 casos, enquanto nas 24 horas anteriores foram apenas 80 casos, indicando crescimento de 50%.
 
-O raio da área de surto é calculado em 3 etapas:
+Este cluster satisfaz todos os critérios: volume de 450 casos supera os 20 mínimos, severidade de 50% excede os 40% requeridos, e crescimento de 50% ultrapassa os 20% necessários. O sistema classifica este cluster como surto ativo e gera alerta epidemiológico.
 
-#### Etapa 1: Distância Euclidiana Máxima
+### 4.6 Exemplo de Classificação Negativa
 
-Calcula a distância de **cada ponto** até o **centroide** e identifica a **distância máxima**:
+Considere outro cluster em Brasília com 300 observações nos últimos 7 dias. Apenas 90 hemogramas mostram leucócitos elevados, representando 30% do total. Nas últimas 24 horas foram 65 casos, e nas 24 horas anteriores foram 62 casos, crescimento de apenas 4,8%.
 
-```python
-distância = √[(lat - centroide_lat)² + (lng - centroide_lng)²]
-distância_máxima = max(todas_distâncias)
-```
+Este cluster falha em dois critérios: severidade de 30% está abaixo dos 40% necessários, e crescimento de 4,8% não alcança os 20% mínimos. Apesar do volume substancial, o sistema não classifica como surto, interpretando como demanda normal de serviços de saúde sem padrão epidemiológico preocupante.
 
-#### Etapa 2: Conversão para Metros
+### 4.7 Seleção do Cluster Mais Severo
 
-Converte graus para metros usando a aproximação:
-
-```
-1 grau ≈ 111 km = 111.000 metros
-```
-
-```python
-raio_metros = distância_máxima × 111.000
-```
-
-#### Etapa 3: Margem de Segurança (+30%)
-
-Adiciona uma **margem de segurança de 30%** para garantir que toda a área afetada seja coberta:
-
-```python
-raio_final = raio_metros × 1.3
-```
-
-**Arquivo**: `application/src/services/geospatial.py:36-64`
-
-#### Exemplo Completo
-
-```
-Pontos:
-- P1: (-16.680, -49.254)
-- P2: (-16.690, -49.264)  ← ponto mais distante
-- P3: (-16.678, -49.252)
-
-Centroide: (-16.683, -49.257)
-
-Distâncias:
-- P1 → Centroide: 0.0042°
-- P2 → Centroide: 0.0099°  ← máxima
-- P3 → Centroide: 0.0071°
-
-Cálculo do Raio:
-1. Distância máxima: 0.0099°
-2. Conversão: 0.0099 × 111.000 = 1.099 metros
-3. Margem 30%: 1.099 × 1.3 = 1.429 metros
-
-RESULTADO: Círculo com raio de 1.429m centrado em (-16.683, -49.257)
-```
+Quando múltiplos clusters satisfazem os critérios simultaneamente, o sistema seleciona aquele com maior percentual de casos elevados. Esta priorização garante que o alerta reflita a situação mais crítica observada. Apenas um surto é reportado por vez, evitando sobrecarga de alertas e focando atenção no evento mais severo.
 
 ---
 
-## 7. Representação Visual no Mapa
+## 5. Cálculo da Região Geográfica do Surto
 
-A área de surto é representada visualmente por:
+### 5.1 Identificação das Observações do Surto
 
-1. **Círculo delimitador**:
-   - Centro: Centroide calculado
-   - Raio: Raio com margem de 30%
-   - Estilo: Borda tracejada amarela, preenchimento gradiente escuro
+Uma vez detectado o surto e identificado o cluster crítico, o sistema coleta todas as observações geográficas deste cluster nos últimos 7 dias. Cada observação possui latitude e longitude precisas que serão utilizadas nos cálculos de delimitação espacial.
 
-2. **Marcadores individuais**:
-   - Cada observação dentro da área é mostrada como ponto individual
-   - Cor indica nível de leucócitos
+### 5.2 Cálculo do Centroide - Centro Geográfico
 
-3. **Label de alerta**:
-   - Exibe "⚠️ SURTO - (X casos)" sobre a área
-   - Número de casos = total de observações
+O centroide representa o ponto central geográfico do surto. É calculado através da média aritmética simples de todas as coordenadas. A latitude do centroide é a soma de todas as latitudes dividida pelo número de observações. A longitude do centroide segue o mesmo princípio.
 
-**Arquivo**: `application/static/heatmap.html:736-820`
+Este cálculo produz o centro de massa geográfico da distribuição de casos. O centroide não necessariamente corresponde a um local onde houve caso específico, mas representa o ponto de equilíbrio espacial do conjunto de observações.
 
----
+### 5.3 Exemplo de Cálculo de Centroide
 
-## 8. Atualização em Tempo Real
+Considere um surto com quatro observações: Ponto A em (-16,680, -49,254), Ponto B em (-16,682, -49,256), Ponto C em (-16,678, -49,252) e Ponto D em (-16,684, -49,258). A latitude do centroide será a soma das quatro latitudes dividida por quatro: (-16,680 - 16,682 - 16,678 - 16,684) / 4 = -16,681. A longitude do centroide será: (-49,254 - 49,256 - 49,252 - 49,258) / 4 = -49,255. O centroide está localizado em (-16,681, -49,255).
 
-O sistema opera em tempo real:
+### 5.4 Cálculo do Raio - Extensão da Área Afetada
 
-- **Cada nova observação** dispara verificação de surto
-- **WebSocket** notifica clientes conectados instantaneamente
-- **Detecção incremental** a cada 50 observações durante seed-data
-- **Mapa atualiza automaticamente** ao receber notificação
+O raio determina o tamanho do círculo que delimitará a região do surto. O cálculo é realizado em três etapas sequenciais, cada uma com propósito específico para garantir cobertura adequada.
 
-**Arquivo**: `application/src/main.py:103-160` (endpoint POST /observations)
+### 5.5 Etapa 1 - Distância Euclidiana Máxima
 
----
+O sistema calcula a distância de cada observação até o centroide usando fórmula euclidiana básica. A distância entre um ponto e o centroide é a raiz quadrada da soma dos quadrados das diferenças de latitude e longitude. O sistema identifica qual observação está mais distante do centroide, e esta distância máxima serve como base para o raio.
 
-## 9. Alertas FHIR
+### 5.6 Etapa 2 - Conversão de Graus para Metros
 
-Quando um surto é detectado, o sistema cria:
+As coordenadas geográficas são expressas em graus, mas distâncias práticas precisam ser em unidades métricas. O sistema aplica conversão padrão onde 1 grau de latitude ou longitude correspone aproximadamente a 111 quilômetros ou 111.000 metros. Esta é uma aproximação válida para cálculos em escalas regionais.
 
-1. **Registro no banco**: Tabela `alerts` (AlertCommunication)
-2. **Recurso FHIR Communication**: Seguindo padrão FHIR R4
-3. **Notificação WebSocket**: Enviada para todos os clientes conectados
-4. **Notificação do navegador**: Se permissões estiverem habilitadas
+A distância máxima encontrada em graus é multiplicada por 111.000, convertendo-a para metros. Este valor representa o raio mínimo que engloba todas as observações do surto.
 
-### Estrutura do Alerta
+### 5.7 Etapa 3 - Margem de Segurança
 
-```json
-{
-  "id": 123,
-  "summary": "Alerta de possivel surto detectado: 450 casos identificados, 50.0% com leucocitos elevados, aumento de 50.0% nas ultimas 24h. Localizacao: (-16.6830, -49.2540)",
-  "created_at": "2024-01-15T10:30:00Z",
-  "fhir_communication": {
-    "resourceType": "Communication",
-    "status": "completed",
-    "category": "alert",
-    ...
-  }
-}
-```
+O raio em metros é então multiplicado por 1,3, adicionando margem de segurança de 30%. Esta margem compensa três fatores: imprecisão inerente às coordenadas GPS, aproximação da conversão de graus para metros, e possibilidade de casos não reportados nas bordas do surto.
+
+A margem garante que a área delimitada seja conservadora, preferindo incluir área adicional a deixar possíveis casos não detectados fora da zona de alerta. Este buffer de segurança é prática epidemiológica padrão.
+
+### 5.8 Exemplo Completo de Cálculo de Raio
+
+Retomando o exemplo anterior com centroide em (-16,681, -49,255), vamos calcular as distâncias. Ponto A está a 0,0042 graus do centroide, Ponto B a 0,0014 graus, Ponto C a 0,0050 graus, e Ponto D a 0,0042 graus. A distância máxima é 0,0050 graus do Ponto C.
+
+Convertendo para metros: 0,0050 × 111.000 = 555 metros. Aplicando margem de 30%: 555 × 1,3 = 722 metros. O raio final da região do surto é 722 metros.
+
+### 5.9 Formato Geométrico - Círculo de Cobertura
+
+A região do surto é representada como círculo perfeito centrado no centroide com o raio calculado. Esta simplificação geométrica facilita visualização e cálculos posteriores, como determinar se novos casos ou usuários estão dentro da zona afetada.
+
+Embora surtos reais possam ter formatos irregulares seguindo rotas de transmissão, vias de transporte ou densidade populacional, o círculo fornece aproximação prática que engloba toda a área afetada com margem de segurança adequada.
 
 ---
 
-## 10. Arquivos de Referência
+## 6. Visualização e Representação no Mapa
 
-| Funcionalidade | Arquivo | Linhas |
-|----------------|---------|--------|
-| **Clustering geográfico** | `src/services/analysis.py` | 11-40 |
-| **Cálculo de estatísticas por cluster** | `src/services/analysis.py` | 43-101 |
-| **Detecção de surtos** | `src/services/analysis.py` | 104-199 |
-| Cálculo de centroide | `src/services/geospatial.py` | 14-33 |
-| Cálculo de raio | `src/services/geospatial.py` | 36-64 |
-| Delimitação de área | `src/services/geospatial.py` | 67-136 |
-| Threshold de leucócitos | `src/utils/fhir_utils.py` | 9 |
-| Visualização no mapa | `static/heatmap.html` | 736-820 |
-| WebSocket em tempo real | `src/services/websocket_manager.py` | 1-111 |
+### 6.1 Elementos Visuais da Região de Surto
 
----
+No mapa interativo, a região de surto é exibida através de múltiplos elementos visuais complementares. Um círculo vermelho semi-transparente marca a área delimitada, permitindo ver características geográficas subjacentes. A borda do círculo é desenhada em vermelho sólido para contraste visual imediato.
 
-## 11. Resumo dos Parâmetros
+Um marcador especial é posicionado exatamente no centroide calculado, indicando o epicentro geográfico do surto. Este marcador exibe informações resumidas quando clicado, incluindo número total de casos e percentual de severidade.
 
-| Parâmetro | Valor | Descrição |
-|-----------|-------|-----------|
-| **Threshold leucócitos** | ≥ 11.000/µL | Considera-se elevado |
-| **Tamanho da grade** | 0.1° (~11km) | Tamanho das células de clustering |
-| **Volume mínimo** | ≥ 20 obs | Mínimo de observações por cluster |
-| **Critério severidade** | > 40% | % de casos elevados no cluster |
-| **Critério crescimento** | > 20% | % de aumento em 24h no cluster |
-| **Janela estatísticas** | 7 dias | Período de análise geral |
-| **Janela crescimento** | 24h vs 24h | Comparação recente |
-| **Margem de segurança** | +30% | Adicional ao raio calculado |
-| **Conversão grau→metro** | 1° ≈ 111km | Aproximação geográfica |
-| **Intervalo tempo real** | 0.05s | Delay entre observações no seed |
+### 6.2 Pontos Individuais de Observação
+
+Cada hemograma que compõe o surto é também representado como ponto individual dentro do círculo. Estes pontos são coloridos conforme o nível de leucócitos observado, permitindo visualizar a distribuição espacial da severidade dentro da região afetada.
+
+### 6.3 Banner de Alerta
+
+Um banner informativo é exibido no topo do mapa quando há surto ativo. O banner resume as estatísticas principais: número de casos, percentual de casos elevados, crescimento nas últimas 24 horas, e localização aproximada do centroide. Este banner permanece visível enquanto o surto atender aos critérios de detecção.
 
 ---
 
-**Última atualização**: 2024-01-19
-**Sistema**: Ubiquo - Monitoramento de Hemogramas
+## 7. Verificação de Localização em Zona de Surto
+
+### 7.1 Cálculo de Inclusão Geográfica
+
+O sistema permite verificar se uma coordenada específica está dentro da zona de surto. Esta funcionalidade é essencial para alertas personalizados aos usuários do aplicativo móvel. O cálculo utiliza a mesma fórmula euclidiana de distância aplicada anteriormente.
+
+Dada uma coordenada de teste, o sistema calcula sua distância até o centroide do surto. Se esta distância for menor ou igual ao raio calculado, a coordenada está dentro da zona afetada. Este teste geométrico simples é extremamente eficiente computacionalmente.
+
+### 7.2 Notificações Móveis Baseadas em Localização
+
+Quando usuários do aplicativo móvel enviam sua localização atualizada, o sistema verifica automaticamente se estão em zona de surto ativa. Usuários dentro da zona recebem notificação push imediata alertando sobre o risco epidemiológico local. Esta notificação inclui recomendações básicas de prevenção e informações sobre a situação atual.
+
+---
+
+## 8. Atualização Contínua e Tempo Real
+
+### 8.1 Reavaliação Automática
+
+O sistema reavalia a situação epidemiológica continuamente. Cada nova observação adicionada ao banco de dados dispara nova análise completa: reagrupamento geográfico, recálculo de estatísticas, reavaliação de critérios e, se necessário, atualização da região delimitada.
+
+Esta abordagem garante que alertas reflitam sempre a situação mais atual. Se novos casos aparecem em área adjacente, o surto pode se expandir. Se casos diminuem e critérios não são mais satisfeitos, o alerta pode ser desativado automaticamente.
+
+### 8.2 Comunicação via WebSocket
+
+Quando a análise detecta mudança significativa - novo surto, expansão de região, ou resolução de surto - notificações são transmitidas instantaneamente via WebSocket para todos os clientes conectados. Mapas em navegadores e aplicativos móveis atualizam automaticamente sem necessidade de recarregar página ou fazer polling.
+
+---
+
+## 9. Considerações Técnicas e Limitações
+
+### 9.1 Aproximações Geográficas
+
+O sistema utiliza distância euclidiana simples e conversão linear de graus para metros. Estas são aproximações válidas para escalas regionais (até centenas de quilômetros) mas não consideram curvatura da Terra. Para áreas muito extensas ou em latitudes extremas, pode haver imprecisão marginal.
+
+### 9.2 Dependência de Geolocalização
+
+A detecção de surtos depende totalmente de observações com coordenadas válidas. Hemogramas sem geolocalização não contribuem para análise espacial, podendo resultar em subdetecção se grande parte dos dados não tiver coordenadas. A qualidade da detecção é diretamente proporcional à cobertura geográfica dos dados.
+
+### 9.3 Calibração de Parâmetros
+
+Os limiares utilizados (20 casos mínimos, 40% de severidade, 20% de crescimento, grade de 0,2 graus) foram definidos empiricamente para balancear sensibilidade e especificidade. Diferentes contextos epidemiológicos ou populacionais podem requerer ajustes destes parâmetros para otimização da detecção.
+
+---
+
+## 10. Resumo do Fluxo Completo
+
+O processo completo de detecção e delimitação segue este fluxo: primeiro, coleta de todas as observações dos últimos 7 dias com coordenadas válidas. Segundo, divisão geográfica em grade de 0,2 graus. Terceiro, mesclagem de células adjacentes. Quarto, cálculo de estatísticas para cada cluster. Quinto, avaliação dos três critérios de surto. Sexto, seleção do cluster mais severo se múltiplos forem detectados. Sétimo, cálculo do centroide geográfico. Oitavo, cálculo do raio com margem de segurança. Nono, delimitação circular da região. Décimo, geração de alerta e notificações. Este ciclo se repete continuamente mantendo vigilância epidemiológica ativa.
+
+---
+
+## 11. Parâmetros de Configuração
+
+| Parâmetro | Valor | Justificativa |
+|-----------|-------|---------------|
+| Tamanho da grade de clustering | 0,2° (~22km) | Balanceia granularidade geográfica com robustez estatística |
+| Volume mínimo de casos | 20 observações | Garante significância estatística, evita flutuações aleatórias |
+| Threshold de leucócitos elevados | ≥ 11.000/µL | Padrão clínico para leucocitose indicando processo infeccioso |
+| Critério de severidade | > 40% elevados | Diferencia surtos reais de variações normais na população |
+| Critério de crescimento | > 20% em 24h | Identifica aceleração epidemiológica significativa |
+| Janela de análise geral | 7 dias | Captura comportamento recente sem incluir eventos antigos |
+| Janela de crescimento | 24h vs 24h | Detecta mudanças agudas no padrão de casos |
+| Margem de segurança do raio | +30% | Compensa imprecisões e garante cobertura completa |
+| Conversão graus para metros | 1° ≈ 111km | Aproximação padrão válida para escalas regionais |
+
+---
+
+**Documento atualizado**: 2025-11-23
+**Sistema**: Ubiquo - Monitoramento Epidemiológico de Hemogramas
+**Versão**: 2.0
