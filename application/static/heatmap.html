@@ -1,182 +1,218 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de Calor - Monitoramento de Hemogramas</title>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mapa de Calor - Monitoramento de Hemogramas</title>
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <!-- Leaflet CSS -->
+        <link rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-    <!-- Component Styles -->
-    <link rel="stylesheet" href="/static/css/base.css">
-    <link rel="stylesheet" href="/static/css/map.css">
-    <link rel="stylesheet" href="/static/css/control-panel.css">
-    <link rel="stylesheet" href="/static/css/filters.css">
-    <link rel="stylesheet" href="/static/css/statistics.css">
-    <link rel="stylesheet" href="/static/css/generate-button.css">
-    <link rel="stylesheet" href="/static/css/status-message.css">
-</head>
-<body>
-    <!-- Control Panel -->
-    <div class="control-panel">
-        <!-- Legend Panel -->
-        <div class="panel-card">
-            <div class="panel-header">
-                <span class="panel-title">Legenda</span>
-                <button class="toggle-btn" onclick="toggleSection('legend')">−</button>
+        <!-- Component Styles -->
+        <link rel="stylesheet" href="/static/css/base.css">
+        <link rel="stylesheet" href="/static/css/map.css">
+        <link rel="stylesheet" href="/static/css/control-panel.css">
+        <link rel="stylesheet" href="/static/css/filters.css">
+        <link rel="stylesheet" href="/static/css/statistics.css">
+        <link rel="stylesheet" href="/static/css/generate-button.css">
+        <link rel="stylesheet" href="/static/css/status-message.css">
+    </head>
+    <body>
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Legend Panel -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Legenda</span>
+                    <button class="toggle-btn"
+                        onclick="toggleSection('legend')">−</button>
+                </div>
+                <div id="legend" class="collapsible-content">
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color"
+                                style="background: #22c55e;"></div>
+                            <span>0 - 5.000 leucócitos (Normal)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color"
+                                style="background: #eab308;"></div>
+                            <span>5.000 - 10.000 leucócitos (Atenção)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color"
+                                style="background: #f97316;"></div>
+                            <span>10.000 - 15.000 leucócitos (Alto)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color"
+                                style="background: #dc2626;"></div>
+                            <span>15.000+ leucócitos (Crítico)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color"
+                                style="background: linear-gradient(135deg, #7c2d12, #4c1d95); border-color: #fbbf24; border-width: 3px;"></div>
+                            <span>Região com surto ativo ⚠️</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="legend" class="collapsible-content">
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #22c55e;"></div>
-                        <span>0 - 5.000 leucócitos (Normal)</span>
+
+            <!-- Filter Panel -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Filtros</span>
+                    <button class="toggle-btn"
+                        onclick="toggleSection('filters')">−</button>
+                </div>
+                <div id="filters" class="collapsible-content">
+                    <div class="filter-section">
+                        <div class="filter-option active" data-filter="all">
+                            <input type="radio" id="filter-all" name="intensity"
+                                value="all" checked>
+                            <label for="filter-all">Todos os Casos</label>
+                        </div>
+                        <div class="filter-option" data-filter="outbreak">
+                            <input type="radio" id="filter-outbreak"
+                                name="intensity" value="outbreak">
+                            <label for="filter-outbreak">Apenas Surtos</label>
+                            <div class="outbreak-indicator"></div>
+                        </div>
+                        <div class="filter-option" data-filter="low">
+                            <input type="radio" id="filter-low" name="intensity"
+                                value="low">
+                            <label for="filter-low">Nível Normal</label>
+                            <div class="intensity-indicator"
+                                style="background: #22c55e;"></div>
+                        </div>
+                        <div class="filter-option" data-filter="normal">
+                            <input type="radio" id="filter-normal"
+                                name="intensity" value="normal">
+                            <label for="filter-normal">Nível Atenção</label>
+                            <div class="intensity-indicator"
+                                style="background: #eab308;"></div>
+                        </div>
+                        <div class="filter-option" data-filter="high">
+                            <input type="radio" id="filter-high"
+                                name="intensity" value="high">
+                            <label for="filter-high">Nível Alto</label>
+                            <div class="intensity-indicator"
+                                style="background: #f97316;"></div>
+                        </div>
+                        <div class="filter-option" data-filter="critical">
+                            <input type="radio" id="filter-critical"
+                                name="intensity" value="critical">
+                            <label for="filter-critical">Nível Crítico</label>
+                            <div class="intensity-indicator"
+                                style="background: #dc2626;"></div>
+                        </div>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #eab308;"></div>
-                        <span>5.000 - 10.000 leucócitos (Atenção)</span>
+                </div>
+            </div>
+
+            <!-- Statistics Panel -->
+            <div class="panel-card">
+                <div class="panel-header">
+                    <span class="panel-title">Estatísticas</span>
+                    <button class="toggle-btn"
+                        onclick="toggleSection('stats')">−</button>
+                </div>
+                <div id="stats" class="collapsible-content">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="total-cases">0</span>
+                            <span class="stat-label">Total de Casos</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value"
+                                id="outbreak-count">0</span>
+                            <span class="stat-label">Surtos Ativos</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value"
+                                id="critical-cases">0</span>
+                            <span class="stat-label">Casos Críticos</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="avg-intensity">0</span>
+                            <span class="stat-label">Média Leucócitos</span>
+                        </div>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #f97316;"></div>
-                        <span>10.000 - 15.000 leucócitos (Alto)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #dc2626;"></div>
-                        <span>15.000+ leucócitos (Crítico)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: linear-gradient(135deg, #7c2d12, #4c1d95); border-color: #fbbf24; border-width: 3px;"></div>
-                        <span>Região com surto ativo ⚠️</span>
+
+                    <div class="outbreak-alert" id="outbreak-alert"
+                        style="display: none;">
+                        <span class="outbreak-icon">⚠️</span>
+                        <div class="outbreak-text">
+                            <strong>Alerta de Surto:</strong> <span
+                                id="outbreak-regions">0</span> região(ões) com
+                            surto ativo detectado
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Filter Panel -->
-        <div class="panel-card">
-            <div class="panel-header">
-                <span class="panel-title">Filtros</span>
-                <button class="toggle-btn" onclick="toggleSection('filters')">−</button>
-            </div>
-            <div id="filters" class="collapsible-content">
-                <div class="filter-section">
-                    <div class="filter-option active" data-filter="all">
-                        <input type="radio" id="filter-all" name="intensity" value="all" checked>
-                        <label for="filter-all">Todos os Casos</label>
+        <!-- Settings Button -->
+        <div class="settings-panel">
+            <button class="settings-btn" id="settingsBtn" title="Configurações">
+                <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0 1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .69.4 1.31 1.02 1.58.13.06.27.1.41.12H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="generate-modal" id="generateModal">
+            <div class="modal-content">
+                <h2 class="modal-title">Gerar Hemogramas de Teste</h2>
+                <div class="modal-form">
+                    <div class="form-group">
+                        <label for="hemogramCount">Quantidade de
+                            Hemogramas:</label>
+                        <input
+                            type="number"
+                            id="hemogramCount"
+                            min="100"
+                            max="10000"
+                            value="1100"
+                            placeholder="Digite a quantidade (100-10000)" />
+                        <div class="input-hint">Mínimo: 100 | Máximo:
+                            10.000</div>
                     </div>
-                    <div class="filter-option" data-filter="outbreak">
-                        <input type="radio" id="filter-outbreak" name="intensity" value="outbreak">
-                        <label for="filter-outbreak">Apenas Surtos</label>
-                        <div class="outbreak-indicator"></div>
-                    </div>
-                    <div class="filter-option" data-filter="low">
-                        <input type="radio" id="filter-low" name="intensity" value="low">
-                        <label for="filter-low">Nível Normal</label>
-                        <div class="intensity-indicator" style="background: #22c55e;"></div>
-                    </div>
-                    <div class="filter-option" data-filter="normal">
-                        <input type="radio" id="filter-normal" name="intensity" value="normal">
-                        <label for="filter-normal">Nível Atenção</label>
-                        <div class="intensity-indicator" style="background: #eab308;"></div>
-                    </div>
-                    <div class="filter-option" data-filter="high">
-                        <input type="radio" id="filter-high" name="intensity" value="high">
-                        <label for="filter-high">Nível Alto</label>
-                        <div class="intensity-indicator" style="background: #f97316;"></div>
-                    </div>
-                    <div class="filter-option" data-filter="critical">
-                        <input type="radio" id="filter-critical" name="intensity" value="critical">
-                        <label for="filter-critical">Nível Crítico</label>
-                        <div class="intensity-indicator" style="background: #dc2626;"></div>
+                    <div class="modal-actions">
+                        <button class="modal-btn modal-btn-primary"
+                            id="generateConfirmBtn">
+                            <span class="btn-text">Gerar</span>
+                            <div class="spinner"></div>
+                        </button>
+                        <button
+                            class="modal-btn modal-btn-secondary modal-close">Cancelar</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Statistics Panel -->
-        <div class="panel-card">
-            <div class="panel-header">
-                <span class="panel-title">Estatísticas</span>
-                <button class="toggle-btn" onclick="toggleSection('stats')">−</button>
-            </div>
-            <div id="stats" class="collapsible-content">
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <span class="stat-value" id="total-cases">0</span>
-                        <span class="stat-label">Total de Casos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="outbreak-count">0</span>
-                        <span class="stat-label">Surtos Ativos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="critical-cases">0</span>
-                        <span class="stat-label">Casos Críticos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="avg-intensity">0</span>
-                        <span class="stat-label">Média Leucócitos</span>
-                    </div>
-                </div>
+        <!-- Status Message -->
+        <div class="status-message" id="statusMessage"></div>
 
-                <div class="outbreak-alert" id="outbreak-alert" style="display: none;">
-                    <span class="outbreak-icon">⚠️</span>
-                    <div class="outbreak-text">
-                        <strong>Alerta de Surto:</strong> <span id="outbreak-regions">0</span> região(ões) com surto ativo detectado
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        <!-- Map Container -->
+        <div id="map"></div>
 
-    <!-- Settings Button -->
-    <div class="settings-panel">
-        <button class="settings-btn" id="settingsBtn" title="Configurações">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V12a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-        </button>
-    </div>
+        <!-- Leaflet JS -->
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Settings Modal -->
-    <div class="generate-modal" id="generateModal">
-        <div class="modal-content">
-            <h2 class="modal-title">Gerar Hemogramas de Teste</h2>
-            <div class="modal-form">
-                <div class="form-group">
-                    <label for="hemogramCount">Quantidade de Hemogramas:</label>
-                    <input
-                        type="number"
-                        id="hemogramCount"
-                        min="100"
-                        max="10000"
-                        value="1100"
-                        placeholder="Digite a quantidade (100-10000)"
-                    />
-                    <div class="input-hint">Mínimo: 100 | Máximo: 10.000</div>
-                </div>
-                <div class="modal-actions">
-                    <button class="modal-btn modal-btn-primary" id="generateConfirmBtn">
-                        <span class="btn-text">Gerar</span>
-                        <div class="spinner"></div>
-                    </button>
-                    <button class="modal-btn modal-btn-secondary modal-close">Cancelar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Status Message -->
-    <div class="status-message" id="statusMessage"></div>
-
-    <!-- Map Container -->
-    <div id="map"></div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Application Scripts (ES6 Modules) -->
-    <script type="module" src="/static/js/main.js"></script>
-</body>
+        <!-- Application Scripts (ES6 Modules) -->
+        <script type="module" src="/static/js/main.js"></script>
+    </body>
 </html>
