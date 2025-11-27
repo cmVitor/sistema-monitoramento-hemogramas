@@ -138,10 +138,10 @@ flowchart TD
 
 | Sprint | Período        | Entregas Principais                                      | Status |
 |--------|----------------|----------------------------------------------------------|--------|
-| Sprint 1 | Setembro/2025 | Marco 1 – Recepção FHIR (Subscription + Parsing)      | ⬜ Pendente |
-| Sprint 2 | Outubro/2025  | Marco 2 – Análise Individual (detecção de desvios)    | ⬜ Pendente |
-| Sprint 3 | Novembro/2025 | Marco 3 – Base Consolidada (persistência dos dados)   | ⬜ Pendente |
-| Sprint 4 | Dezembro/2025 | Marco 4 – Análise Coletiva (padrões populacionais)    | ⬜ Pendente |
+| Sprint 1 | Setembro/2025 | Marco 1 – Recepção FHIR (Subscription + Parsing)      | ✅ Concluído |
+| Sprint 2 | Outubro/2025  | Marco 2 – Análise Individual (detecção de desvios)    | ✅ Concluído |
+| Sprint 3 | Novembro/2025 | Marco 3 – Base Consolidada (persistência dos dados)   | ✅ Concluído |
+| Sprint 4 | Dezembro/2025 | Marco 4 – Análise Coletiva (padrões populacionais)    | ✅ Concluído |
 | Sprint Final| Dezembro/2025 | Entrega Final - Apresentação do sistema completo, incluindo API, App Móvel e documentação final | ⬜ Pendente | 
 Legenda: ⬜ Pendente | 🟨 Em andamento | ✅ Concluído
 
